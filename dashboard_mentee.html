@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="dashboard-grid">
+        <div class="sidebar">
+            <h3>Mentee Navigation</h3>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}" class="active">Dashboard Overview</a></li>
+                <li><a href="{{ url_for('profile') }}">My Profile</a></li>
+                <li><a href="{{ url_for('create_project_page') }}">Propose New Project</a></li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <h2>Mentee Dashboard</h2>
+            <p>Welcome, {{ user.username }}! Here is an overview of your mentorship journey.</p>
+
+            <div class="stats-grid">
+                <div class="stat-card interactive" onclick="toggleSection('projectInfo')">
+                    <h3>Current Project</h3>
+                    <p class="stat-number">{{ "1" if assigned_project else "0" }}/1</p>
+                    <div class="stat-hover">Click to view project details</div>
+                </div>
+                <div class="stat-card interactive" onclick="toggleSection('taskManagement')">
+                    <h3>Tasks Completed</h3>
+                    <p class="stat-number" id="completedTasksCount">0</p>
+                    <div class="stat-hover">Click to manage tasks</div>
+                </div>
+                <div class="stat-card interactive" onclick="toggleSection('progressTracking')">
+                    <h3>Overall Progress</h3>
+                    <p class="stat-number" id="progressPercentage">0%</p>
+                    <div class="stat-hover">Click to track progress</div>
+                </div>
+                <div class="stat-card interactive" onclick="toggleSection('mentorSection')">
+                    <h3>My Mentor</h3>
+                    <p class="stat-number">{{ "1" if assigned_project and assigned_project.mentor_id else "0" }}/1</p>
+                    <div class="stat-hover">Click to view mentor details</div>
+                </div>
+            </div>
+
+            <div class="card collapsible-section" id="mentorSection" style="display: none;">
+                <div class="section-header">
+                    <h3><i class="fas fa-user-tie"></i> My Mentor</h3>
+                    <button class="btn-close-section" onclick="toggleSection('mentorSection')"><i class="fas fa-times"></i></button>
+                </div>
+                {% if assigned_project and assigned_project.mentor_id %}
+                    {% set mentor = get_user_by_id(assigned_project.mentor_id) %}
+                    {% if mentor %}
+                    <div class="mentor-info-expanded">
+                        <div class="mentor-main">
+                            <div class="mentor-avatar-large"><i class="fas fa-user-circle"></i></div>
+                            <div class="mentor-details">
+                                <h4>{{ mentor.profile.full_name if mentor.profile and mentor.profile.full_name else mentor.username }}</h4>
+                                <div class="contact-info">
+                                    <p><i class="fas fa-envelope"></i> <strong>Email:</strong> <a href="mailto:{{ mentor.email }}">{{ mentor.email }}</a></p>
+                                    {% if mentor.profile and mentor.profile.years_experience %}
+                                    <p><i class="fas fa-briefcase"></i> <strong>Experience:</strong> {{ mentor.profile.years_experience }} years</p>
+                                    {% endif %}
+                                    {% if mentor.profile and mentor.profile.availability %}
+                                    <p><i class="fas fa-clock"></i> <strong>Availability:</strong> {{ mentor.profile.availability }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mentor-actions">
+                            <button class="btn-action btn-email" onclick="window.location.href='mailto:{{ mentor.email }}'"><i class="fas fa-envelope"></i> Send Email</button>
+                            <button class="btn-action btn-chat" onclick="alert('Chat functionality coming soon!')"><i class="fas fa-comments"></i> Start Chat</button>
+                            <button class="btn-action btn-feedback" onclick="openFeedbackModal('{{ assigned_project._id }}')"><i class="fas fa-star"></i> Provide Feedback</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="no-data-card"><i class="fas fa-user-slash"></i><p>Mentor information could not be loaded.</p></div>
+                    {% endif %}
+                {% else %}
+                <div class="no-data-card"><i class="fas fa-user-plus"></i><p>No mentor assigned yet. A coordinator will assign one soon.</p></div>
+                {% endif %}
+            </div>
+            
+            <div class="card collapsible-section" id="projectInfo" style="display: none;">
+                <div class="section-header">
+                    <h3><i class="fas fa-project-diagram"></i> Project Details</h3>
+                    <button class="btn-close-section" onclick="toggleSection('projectInfo')"><i class="fas fa-times"></i></button>
+                </div>
+                {% if assigned_project %}
+                    <div class="project-details-expanded">
+                        <div class="project-header-main">
+                             <h4>{{ assigned_project.title }}</h4>
+                             <span class="status-badge status-{{ assigned_project.status|lower|replace(' ', '-') }}">{{ assigned_project.status }}</span>
+                        </div>
+                        <p class="project-description">{{ assigned_project.description }}</p>
+                        <div class="project-meta-grid">
+                            <div class="meta-item"><i class="fas fa-calendar-alt"></i><span>Started: {{ assigned_project.created_at.strftime('%B %d, %Y') }}</span></div>
+                            <div class="meta-item"><i class="fas fa-tasks"></i><span>Total Tasks: {{ assigned_project.tasks|length }}</span></div>
+                            <div class="meta-item"><i class="fas fa-chart-line"></i><span>Progress: <span id="projectProgressDetail">0%</span></span></div>
+                        </div>
+                        <div class="project-actions-expanded">
+                           <button class="btn-primary" onclick="toggleSection('taskManagement')"><i class="fas fa-tasks"></i> Manage Tasks</button>
+                           <a href="{{ url_for('gantt_chart', project_id=assigned_project._id) }}" class="btn-secondary"><i class="fas fa-chart-bar"></i> View Gantt Chart</a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="no-data-card">
+                        <i class="fas fa-folder-open"></i>
+                        <h4>No Active Project</h4>
+                        <p>You are not assigned to a project. You can propose one to get started.</p>
+                        <a href="{{ url_for('create_project_page') }}" class="btn-primary"><i class="fas fa-plus"></i> Propose New Project</a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="card collapsible-section" id="taskManagement" style="display: none;">
+                <div class="section-header">
+                    <h3><i class="fas fa-tasks"></i> Task Management</h3>
+                    <button class="btn-close-section" onclick="toggleSection('taskManagement')"><i class="fas fa-times"></i></button>
+                </div>
+                {% if assigned_project %}
+                    <div class="task-management-expanded">
+                         <div class="task-filters">
+                            <button class="btn-filter active" onclick="filterTasks('all', this)">All</button>
+                            <button class="btn-filter" onclick="filterTasks('pending', this)">Pending</button>
+                            <button class="btn-filter" onclick="filterTasks('completed', this)">Completed</button>
+                        </div>
+                        <div class="tasks-list-expanded" id="tasksList">
+                            {% if assigned_project.tasks %}
+                                {% for task in assigned_project.tasks %}
+                                <div class="task-item-expanded {% if task.completed %}task-completed{% endif %}" data-status="{% if task.completed %}completed{% else %}pending{% endif %}" data-task-id="{{ task._id }}">
+                                    <div class="task-main">
+                                        <input type="checkbox" id="task-{{ task._id }}" 
+                                               {% if task.completed %}checked{% endif %}
+                                               onchange="updateTaskStatus('{{ assigned_project._id }}', '{{ task._id }}', this.checked)">
+                                        <label for="task-{{ task._id }}">{{ task.name }}</label>
+                                    </div>
+                                    <div class="task-due-date">
+                                        {% if task.due_date %}
+                                        <i class="fas fa-calendar-day"></i> {{ task.due_date}}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="no-data-card"><i class="fas fa-clipboard-list"></i><p>No tasks have been assigned to this project yet.</p></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                <div class="no-data-card"><i class="fas fa-folder-open"></i><p>You need an active project to manage tasks.</p></div>
+                {% endif %}
+            </div>
+
+            <div class="card collapsible-section" id="progressTracking" style="display: none;">
+                <div class="section-header">
+                    <h3><i class="fas fa-chart-line"></i> Progress Tracking</h3>
+                    <button class="btn-close-section" onclick="toggleSection('progressTracking')"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="progress-tracking-expanded">
+                    <div class="progress-visual">
+                        <svg class="progress-circle" width="120" height="120" viewBox="0 0 120 120">
+                           <circle class="progress-circle-bg" cx="60" cy="60" r="54" fill="none" stroke-width="12"></circle>
+                           <circle class="progress-circle-progress" id="circleProgress" cx="60" cy="60" r="54" fill="none" stroke-width="12"></circle>
+                        </svg>
+                        <div class="progress-text" id="circlePercentage">0%</div>
+                    </div>
+                    <div class="progress-details">
+                        <div class="detail-item"><strong>Total Tasks:</strong> <span id="totalTasks">0</span></div>
+                        <div class="detail-item"><strong>Completed:</strong> <span id="completedTasksDetail">0</span></div>
+                        <div class="detail-item"><strong>Pending:</strong> <span id="pendingTasks">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dual-section-grid">
+                <div class="card">
+                    <div class="section-header">
+                        <h3><i class="fas fa-bullseye"></i> Learning Goals</h3>
+                    </div>
+                    <div id="learningGoalsList" class="content-list">
+                        <div class="no-data-card"><i class="fas fa-spinner fa-spin"></i><p>Loading goals...</p></div>
+                    </div>
+                     <div class="card-footer">
+                        <button class="btn-add-item" onclick="openAddGoalModal()"><i class="fas fa-plus"></i> Add New Goal</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3><i class="fas fa-history"></i> Project History</h3>
+                    </div>
+                    <div id="projectHistoryList" class="content-list">
+                        <div class="no-data-card"><i class="fas fa-spinner fa-spin"></i><p>Loading history...</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'modals/add_goal_modal.html' %}
+    {# Add other modals like feedback if they exist #}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- Section Management ---
+    function toggleSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        const allSections = document.querySelectorAll('.collapsible-section');
+
+        allSections.forEach(sec => {
+            if (sec.id !== sectionId) {
+                sec.style.display = 'none';
+            }
+        });
+
+        if (section.style.display === 'none' || section.style.display === '') {
+            section.style.display = 'block';
+        } else {
+            section.style.display = 'none';
+        }
+    }
+
+    // --- Task and Progress Calculation ---
+    function calculateProgress() {
+        const tasks = document.querySelectorAll('.task-item-expanded');
+        const completedTasks = document.querySelectorAll('.task-item-expanded.task-completed');
+        const total = tasks.length;
+        const completed = completedTasks.length;
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        // Update stat cards
+        document.getElementById('completedTasksCount').innerText = `${completed}/${total}`;
+        document.getElementById('progressPercentage').innerText = `${progress}%`;
+        
+        // Update project detail card
+        const progressDetail = document.getElementById('projectProgressDetail');
+        if(progressDetail) progressDetail.innerText = `${progress}%`;
+
+        // Update progress tracking section
+        updateProgressCircle(progress, total, completed);
+    }
+
+    function updateProgressCircle(progress, total, completed) {
+        const circle = document.getElementById('circleProgress');
+        const radius = circle.r.baseVal.value;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (progress / 100) * circumference;
+
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+        circle.style.strokeDashoffset = offset;
+        
+        document.getElementById('circlePercentage').innerText = `${progress}%`;
+        document.getElementById('totalTasks').innerText = total;
+        document.getElementById('completedTasksDetail').innerText = completed;
+        document.getElementById('pendingTasks').innerText = total - completed;
+    }
+
+    function updateTaskStatus(projectId, taskId, isCompleted) {
+        // Here you would typically make an API call to update the backend
+        console.log(`Updating task ${taskId} for project ${projectId} to completed: ${isCompleted}`);
+        
+        // Simulate UI update
+        const taskItem = document.querySelector(`.task-item-expanded[data-task-id='${taskId}']`);
+        if (taskItem) {
+            taskItem.classList.toggle('task-completed', isCompleted);
+            taskItem.dataset.status = isCompleted ? 'completed' : 'pending';
+            taskItem.querySelector('input[type="checkbox"]').disabled = isCompleted; // Optional: disable checkbox after completion
+            calculateProgress(); // Recalculate progress after status change
+        }
+        
+        // Example API call
+        /*
+        fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completed: isCompleted })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.message);
+            calculateProgress();
+        })
+        .catch(error => console.error('Error updating task:', error));
+        */
+    }
+
+    function filterTasks(status, btn) {
+        const tasks = document.querySelectorAll('.task-item-expanded');
+        tasks.forEach(task => {
+            if (status === 'all' || task.dataset.status === status) {
+                task.style.display = 'flex';
+            } else {
+                task.style.display = 'none';
+            }
+        });
+        
+        // Update active button style
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    // --- Data Loading from API ---
+    async function loadLearningGoals() {
+        const goalsList = document.getElementById('learningGoalsList');
+        try {
+            const response = await fetch('/api/mentee/goals');
+            if (!response.ok) throw new Error('Failed to fetch goals');
+            const goals = await response.json();
+            
+            if (goals.length === 0) {
+                goalsList.innerHTML = `<div class="no-data-card"><i class="fas fa-bullseye"></i><p>No learning goals added yet. Add one to get started!</p></div>`;
+                return;
+            }
+            
+            goalsList.innerHTML = goals.map(goal => `
+                <div class="list-item">
+                    <span class="item-title">${goal.title}</span>
+                    <span class="badge status-${goal.status}">${goal.status}</span>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            goalsList.innerHTML = `<div class="no-data-card"><i class="fas fa-exclamation-triangle"></i><p>Could not load learning goals.</p></div>`;
+            console.error(error);
+        }
+    }
+
+    async function loadProjectHistory() {
+        const historyList = document.getElementById('projectHistoryList');
+        try {
+            const response = await fetch('/api/mentee/project_history');
+            if (!response.ok) throw new Error('Failed to fetch history');
+            const projects = await response.json();
+            
+            if (projects.length === 0) {
+                historyList.innerHTML = `<div class="no-data-card"><i class="fas fa-history"></i><p>No project history found.</p></div>`;
+                return;
+            }
+            
+            historyList.innerHTML = projects.map(p => `
+                 <div class="list-item">
+                    <span class="item-title">${p.title}</span>
+                    <span class="badge status-${p.status.toLowerCase().replace(' ','-')}">${p.status}</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            historyList.innerHTML = `<div class="no-data-card"><i class="fas fa-exclamation-triangle"></i><p>Could not load project history.</p></div>`;
+            console.error(error);
+        }
+    }
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+        calculateProgress();
+        loadLearningGoals();
+        loadProjectHistory();
+    });
+</script>
+
+<style>
+    /* --- Main Layout & Cards --- */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
+    .stat-card h3 { margin-top: 0; font-size: 1rem; color: #6c757d; }
+    .stat-number { font-size: 2.5rem; font-weight: bold; color: #343a40; margin: 0.5rem 0; }
+    .stat-card.interactive { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; position: relative; overflow: hidden; }
+    .stat-card.interactive:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+    .stat-hover { position: absolute; bottom: -30px; left: 0; right: 0; background: #007bff; color: white; padding: 5px; font-size: 0.8rem; transition: bottom 0.3s ease; }
+    .stat-card.interactive:hover .stat-hover { bottom: 0; }
+    
+    .card { background: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-top: 1.5rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #e9ecef; }
+    .section-header h3 { margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.75rem; color: #343a40;}
+    .btn-close-section { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #6c757d; }
+    .btn-close-section:hover { color: #dc3545; }
+    
+    .collapsible-section { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- Mentor Section --- */
+    .mentor-info-expanded { padding: 1.5rem; }
+    .mentor-main { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .mentor-avatar-large { font-size: 4rem; color: #007bff; }
+    .contact-info p { margin: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    .mentor-actions { display: flex; gap: 1rem; flex-wrap: wrap; border-top: 1px solid #e9ecef; padding-top: 1.5rem; }
+    .btn-action { padding: 0.6rem 1.2rem; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; transition: opacity 0.2s; }
+    .btn-email { background-color: #007bff; color: white; }
+    .btn-chat { background-color: #28a745; color: white; }
+    .btn-feedback { background-color: #ffc107; color: #212529; }
+    .btn-action:hover { opacity: 0.85; }
+
+    /* --- Project & Task Section --- */
+    .project-details-expanded { padding: 1.5rem; }
+    .project-header-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .status-badge { padding: 0.25em 0.6em; font-size: 0.8rem; font-weight: bold; border-radius: 1rem; }
+    .status-in-progress { background-color: #e6f7ff; color: #007bff; }
+    .status-completed { background-color: #e9f7ef; color: #28a745; }
+    .status-proposed { background-color: #fff8e1; color: #ffc107; }
+    .project-description { color: #6c757d; margin-bottom: 1.5rem; }
+    .project-meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .meta-item { display: flex; align-items: center; gap: 0.5rem; background: #f8f9fa; padding: 0.75rem; border-radius: 6px; }
+
+    .task-management-expanded { padding: 1.5rem; }
+    .task-filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .btn-filter { background: #f1f3f5; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+    .btn-filter.active { background: #007bff; color: white; }
+    .task-item-expanded { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 0.5rem; }
+    .task-item-expanded.task-completed { background: #f8f9fa; text-decoration: line-through; color: #6c757d; }
+    .task-main { display: flex; align-items: center; gap: 0.75rem; }
+    
+    /* --- Progress Circle --- */
+    .progress-tracking-expanded { padding: 1.5rem; display: flex; align-items: center; gap: 2rem; }
+    .progress-visual { position: relative; width: 120px; height: 120px; }
+    .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.8rem; font-weight: bold; color: #343a40; }
+    .progress-circle-bg { stroke: #e9ecef; }
+    .progress-circle-progress { stroke: #28a745; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.8s ease; }
+    .progress-details .detail-item { font-size: 1rem; margin-bottom: 0.5rem; }
+
+    /* --- Dual Section & Lists --- */
+    .dual-section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+    .content-list { max-height: 250px; overflow-y: auto; padding: 0 1.5rem 1.5rem; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f3f5; }
+    .list-item:last-child { border-bottom: none; }
+    .item-title { font-weight: 500; }
+    .badge { padding: 0.2em 0.5em; font-size: 0.75rem; border-radius: 8px; }
+    .card-footer { padding: 1rem 1.5rem; border-top: 1px solid #e9ecef; }
+    .btn-add-item { width: 100%; background: #f8f9fa; border: 1px dashed #dee2e6; padding: 0.75rem; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .btn-add-item:hover { background: #e9ecef; }
+    .no-data-card { padding: 2rem; text-align: center; color: #6c757d; }
+    .no-data-card i { font-size: 2.5rem; margin-bottom: 1rem; display: block; color: #adb5bd; }
+
+    @media (max-width: 992px) {
+        .dual-section-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+        .stats-grid { grid-template-columns: 1fr 1fr; }
+        .progress-tracking-expanded { flex-direction: column; text-align: center; }
+    }
+</style>
+{% endblock %}

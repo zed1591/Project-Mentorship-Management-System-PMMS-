@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 Server Error - PMMS</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #f8fafc; 
+            margin: 0; 
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .error-container { 
+            text-align: center; 
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #ef4444; margin-bottom: 1rem; }
+        p { color: #6b7280; margin-bottom: 2rem; }
+        a { 
+            color: #3b82f6; 
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid #3b82f6;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        a:hover { 
+            background: #3b82f6; 
+            color: white; 
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>500 - Server Error</h1>
+        <p>Something went wrong on our end. Please try again later.</p>
+        <a href="{{ url_for('dashboard') }}">Return to Dashboard</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gantt Chart</title>
+    <!-- Tailwind CSS CDN for overall page styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Header Section -->
+    <header class="bg-white shadow-sm py-4 px-6 flex items-center justify-between">
+        <h1 class="text-xl font-bold text-gray-800">PMMS</h1>
+        <div class="flex items-center space-x-4">
+            <span class="text-gray-600 hidden md:block">Gantt Chart View</span>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-6 md:p-8">
+        <div class="main-content bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Gantt Chart for Project: {{ project.title }}</h2>
+            <p class="text-gray-600 mb-6">Visualize project tasks and their timelines.</p>
+
+            <!-- The Gantt chart will be rendered here -->
+            <div id="gantt_chart_div" class="w-full" style="height: 500px;" data-gantt-api-url="{{ url_for('get_gantt_data', project_id=project['_id']) }}">
+                <p class="text-center text-gray-500 py-10">Loading Gantt chart...</p>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Google Charts library and our custom script -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        // Load the Google Gantt chart package
+        google.charts.load('current', {'packages':['gantt']});
+        google.charts.setOnLoadCallback(drawChart);
+
+        async function drawChart() {
+            // Retrieve the API URL from the data attribute on the chart div
+            const ganttChartDiv = document.getElementById('gantt_chart_div');
+            const ganttDataUrl = ganttChartDiv.dataset.ganttApiUrl;
+
+            try {
+                // Fetch the task data from the Flask API
+                const response = await fetch(ganttDataUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const rawData = await response.json();
+
+                // Create a data table for the chart
+                const data = new google.visualization.DataTable();
+                data.addColumn('string', 'Task ID');
+                data.addColumn('string', 'Task Name');
+                data.addColumn('string', 'Resource');
+                data.addColumn('date', 'Start Date');
+                data.addColumn('date', 'End Date');
+                data.addColumn('number', 'Duration');
+                data.addColumn('number', 'Percent Complete');
+                data.addColumn('string', 'Dependencies');
+
+                // Map the fetched data to the format required by Google Charts
+                const rows = rawData.map(item => {
+                    const startDate = item[3] ? new Date(item[3]) : null;
+                    const endDate = item[4] ? new Date(item[4]) : null;
+                    return [
+                        item[0], item[1], item[2], startDate, endDate, item[5], item[6], item[7]
+                    ];
+                });
+                data.addRows(rows);
+
+                // Set up the chart options, including the crucial font style fix
+                const options = {
+                    height: rows.length * 41 + 50,
+                    gantt: {
+                        defaultStartDate: new Date(),
+                        criticalPathEnabled: false,
+                        arrow: {
+                            angle: 100,
+                            width: 5,
+                            color: '#555'
+                        },
+                        // The fix for garbled text: set a reliable font
+                        textStyle: {
+                            fontName: 'Arial, sans-serif'
+                        }
+                    }
+                };
+
+                // Draw the chart
+                const chart = new google.visualization.Gantt(ganttChartDiv);
+                chart.draw(data, options);
+
+            } catch (error) {
+                console.error('Error fetching or drawing Gantt chart:', error);
+                ganttChartDiv.innerHTML = '<p class="text-center text-red-500 py-10">Failed to load Gantt chart. Please check the data source.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
+

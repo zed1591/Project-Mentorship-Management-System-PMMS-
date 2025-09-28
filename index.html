@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <section class="hero-with-video">
+        <div class="video-background">
+            <video autoplay muted loop playsinline id="background-video">
+                <source src="{{ url_for('static', filename='videos/background.mp4') }}" type="video/mp4">
+                <source src="{{ url_for('static', filename='videos/background.webm') }}" type="video/webm">
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-overlay"></div>
+        </div>
+        
+        <div class="video-content container">
+            <h1 class="hero-title">Project Mentorship Management System</h1>
+            <p class="hero-subtitle">Streamline mentorship programs with our comprehensive platform designed for educational institutions and organizations</p>
+            <a href="{{ url_for('register') }}" class="btn get-started-btn">Get Started</a>
+        </div>
+    </section>
+
+    <div class="content-section">
+        <div class="container">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Mentor Matching</h3>
+                    <p>Intelligent algorithm connects students with the perfect mentors based on skills, interests, and goals.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <h3>Project Tracking</h3>
+                    <p>Monitor progress, set milestones, and ensure projects stay on track with our comprehensive tools.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h3>Communication Hub</h3>
+                    <p>Built-in messaging and video conferencing for seamless collaboration between mentors and mentees.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="icon-circle">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Progress Analytics</h3>
+                    <p>Detailed reports and analytics to measure the success of your mentorship programs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   <section class="content-section light-bg-section">
+        <div class="container">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">Get started in three simple steps and embark on your mentorship journey.</p>
+            <div class="how-it-works-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Register and Create Profile</h3>
+                    <p>Sign up as a mentor or mentee and fill out your profile with skills, interests, and goals to help us find your perfect match.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Find Your Match</h3>
+                    <p>Our smart matching algorithm suggests the best partners for you. Browse profiles, connect, and agree on a project to start.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Collaborate and Grow</h3>
+                    <p>Use our built-in tools to manage projects, track progress, and communicate effectively. Achieve your goals together.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="container">
+            <h2 class="section-title">What Our Users Say</h2>
+            <p class="section-subtitle">Discover how PMMS has made a difference in their careers and academic journeys.</p>
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <p class="testimonial-text">This platform made it incredibly easy to find a mentor who perfectly matched my career goals. The project management tools are a huge plus!</p>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Abebe K.</h4>
+                            <p>Computer Science Student</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <p class="testimonial-text">As a mentor, I can manage multiple mentees effortlessly. The structured environment helps keep everyone on track and focused.</p>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Tigist M.</h4>
+                            <p>Senior Software Engineer</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <p class="testimonial-text">The analytics dashboard is fantastic for our university's program coordinator. We can now track the success of our mentorship program with real data.</p>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Zemed A.</h4>
+                            <p>University Coordinator</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="final-cta-section">
+        <div class="container">
+            <h2>Ready to Foster Growth?</h2>
+            <p>Join a community of passionate learners and experienced professionals. Start your mentorship journey today and unlock your full potential.</p>
+            <a href="{{ url_for('register') }}" class="btn get-started-btn">Start Your Journey</a>
+        </div>
+    </section>
+{% endblock %}

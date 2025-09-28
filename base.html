@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>PMMS - Project Mentorship Management System</title>
+    
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    {{ moment.include_moment() }}
+</head>
+<body>
+    <div class="theme-controls">
+        <button id="theme-toggle" class="theme-btn" title="Toggle Day/Night Mode">
+            <i class="fas fa-moon"></i>
+        </button>
+        <div class="background-selector">
+            <button class="bg-select-btn" title="Change Background" id="bg-toggle">
+                <i class="fas fa-image"></i>
+            </button>
+            <div class="bg-options" id="bg-options">
+                <div class="bg-option" data-bg="video" title="Video Background">
+                    <i class="fas fa-video"></i> Video
+                </div>
+                <div class="bg-option" data-bg="gradient1" title="Blue Gradient">
+                    <i class="fas fa-paint-roller"></i> Blue
+                </div>
+                <div class="bg-option" data-bg="gradient2" title="Purple Gradient">
+                    <i class="fas fa-paint-roller"></i> Purple
+                </div>
+                <div class="bg-option" data-bg="solid" title="Solid Color">
+                    <i class="fas fa-square"></i> Solid
+                </div>
+                <div class="bg-option" data-bg="none" title="No Background">
+                    <i class="fas fa-times"></i> None
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification-container" id="notification-container">
+        </div>
+    
+    <video id="background-video" autoplay muted loop class="video-background">
+        <source src="{{ url_for('static', filename='videos/background.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    
+    <div class="video-content">
+        <header>
+            <div class="container">
+                <a href="{{ url_for('index') }}" class="logo">
+                    PMMS
+                </a>
+                <nav>
+                    <ul>
+                        <li><a href="{{ url_for('index') }}" class="animated-link">Home</a></li>
+                        <li><a href="{{ url_for('about') }}" class="animated-link">About</a></li>
+                        {% if 'user_id' in session %}
+                            <li><a href="{{ url_for('dashboard') }}" class="animated-link">Dashboard</a></li>
+                            <li><a href="{{ url_for('profile') }}" class="animated-link">Profile</a></li>
+                            
+                            <li class="notifications-item">
+                                <div class="notifications-container">
+                                    <button id="notifications-btn" class="notifications-button">
+                                        <i class="fas fa-bell"></i>
+                                        <span id="notification-count" class="notification-badge">0</span>
+                                    </button>
+                                    
+                                    <div id="notifications-panel" class="notifications-panel">
+                                        <div class="notifications-header">
+                                            <h3>Notifications</h3>
+                                            <button id="clear-notifications" class="clear-btn">Clear All</button>
+                                        </div>
+                                        <div id="notifications-list" class="notifications-list">
+                                            <div class="notification-empty">No new notifications</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            
+                            <li><a href="{{ url_for('logout') }}" class="animated-link logout-btn">Logout ({{ session.username }})</a></li>
+                        {% else %}
+                            <li><a href="{{ url_for('login') }}" class="animated-link">Login</a></li>
+                            <li><a href="{{ url_for('register') }}" class="animated-link">Register</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            <span>{{ message }}</span>
+                            <button class="flash-close">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <main class="container">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer>
+            <div class="container">
+                <p>&copy; {{ now.year }} Project Mentorship Management System. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="{{ url_for('about') }}">About</a>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Contact</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div id="message-box-overlay" class="message-box-overlay">
+        <div class="message-box">
+            <h3 id="message-box-title">Message</h3>
+            <p id="message-box-text"></p>
+            <button id="message-box-close" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+        // CSRF token setup for AJAX requests
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        
+        // Set up default headers for fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            if (args[1] && args[1].headers) {
+                args[1].headers['X-CSRFToken'] = csrfToken;
+            } else if (args[1]) {
+                args[1].headers = {'X-CSRFToken': csrfToken};
+            }
+            return originalFetch.apply(this, args);
+        };
+        
+        // Initialize theme from localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            const savedBackground = localStorage.getItem('background') || 'gradient1';
+            document.body.setAttribute('data-background', savedBackground);
+            
+            // Update theme toggle icon
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (savedTheme === 'dark') {
+                themeIcon.className = 'fas fa-sun';
+            } else {
+                themeIcon.className = 'fas fa-moon';
+            }
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

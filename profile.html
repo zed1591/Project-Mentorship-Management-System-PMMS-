@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="registration-container">
+        <div class="registration-header">
+            <h2>My Profile</h2>
+            <p>Update your personal and professional information</p>
+        </div>
+
+        <div class="registration-form-card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% if error %}
+                <p class="error-message">{{ error }}</p>
+            {% endif %}
+            
+            <form action="{{ url_for('profile') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" value="{{ user.username }}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ user.email }}" readonly>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="bio">Bio</label>
+                    <textarea id="bio" name="bio" maxlength="500">{{ profile.bio if profile.bio else '' }}</textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact_info">Contact Info</label>
+                        <input type="text" id="contact_info" name="contact_info" value="{{ profile.contact_info if profile.contact_info else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="skills">Skills (comma-separated)</label>
+                        <input type="text" id="skills" name="skills" value="{{ profile.skills | join(', ') if profile.skills else '' }}">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="linkedin">LinkedIn Profile URL</label>
+                        <input type="url" id="linkedin" name="linkedin" value="{{ profile.linkedin if profile.linkedin else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="github">GitHub Profile URL</label>
+                        <input type="url" id="github" name="github" value="{{ profile.github if profile.github else '' }}">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Form submission loading state
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Updating...';
+        });
+
+        // Real-time character count for textareas
+        document.querySelectorAll('textarea').forEach(textarea => {
+            const maxLength = textarea.getAttribute('maxlength');
+            if (maxLength) {
+                const counter = document.createElement('div');
+                counter.style.fontSize = '0.8rem';
+                counter.style.color = '#666';
+                counter.style.textAlign = 'right';
+                counter.style.marginTop = '0.25rem';
+                textarea.parentNode.appendChild(counter);
+                
+                function updateCounter() {
+                    const currentLength = textarea.value.length;
+                    counter.textContent = `${currentLength}/${maxLength} characters`;
+                    if (currentLength > maxLength * 0.9) {
+                        counter.style.color = '#dc3545';
+                    } else {
+                        counter.style.color = '#666';
+                    }
+                }
+                
+                textarea.addEventListener('input', updateCounter);
+                updateCounter();
+            }
+        });
+    </script>
+{% endblock %}

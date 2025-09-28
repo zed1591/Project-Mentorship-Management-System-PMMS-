@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="project-creation-header">
+        <h2>Propose New Project</h2>
+        <p>Fill out the form below to propose a new project for mentorship.</p>
+    </div>
+
+    <div class="project-form-container">
+        <form id="createProjectForm">
+            <!-- CSRF Token will be handled by JavaScript -->
+            
+            <div class="form-group">
+                <label for="title">Project Title *</label>
+                <input type="text" id="title" name="title" required 
+                       placeholder="Enter a descriptive title for your project">
+            </div>
+
+            <div class="form-group">
+                <label for="description">Project Description *</label>
+                <textarea id="description" name="description" required 
+                          placeholder="Describe your project goals, requirements, and expected outcomes"
+                          rows="6"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="skills">Required Skills</label>
+                <input type="text" id="skills" name="skills" 
+                       placeholder="List relevant skills (e.g., Python, JavaScript, Project Management)">
+            </div>
+
+            <div class="form-group">
+                <label for="timeline">Expected Timeline (weeks)</label>
+                <input type="number" id="timeline" name="timeline" min="1" max="52" 
+                       placeholder="Estimated duration in weeks">
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit Project Proposal</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <div id="successMessage" class="success-message" style="display: none;"></div>
+        </form>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.project-creation-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.project-creation-header h2 {
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.project-creation-header p {
+    color: #6b7280;
+}
+
+.project-form-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+
+.btn-primary:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+}
+
+.error-message {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border: 1px solid #fecaca;
+}
+
+.success-message {
+    background: #f0fdf4;
+    color: #16a34a;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border: 1px solid #bbf7d0;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s ease-in-out infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .container {
+        margin: 1rem auto;
+        padding: 0 0.5rem;
+    }
+    
+    .project-form-container {
+        padding: 1rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('createProjectForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const errorDiv = document.getElementById('errorMessage');
+    const successDiv = document.getElementById('successMessage');
+    
+    // Function to get CSRF token from meta tag or form input
+    function getCSRFToken() {
+        // Try to get from meta tag
+        const metaToken = document.querySelector('meta[name="csrf-token"]');
+        if (metaToken) {
+            return metaToken.getAttribute('content');
+        }
+        
+        // Try to get from hidden input
+        const inputToken = document.querySelector('input[name="csrf_token"]');
+        if (inputToken) {
+            return inputToken.value;
+        }
+        
+        console.warn('CSRF token not found');
+        return null;
+    }
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Clear previous messages
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+        
+        // Basic client-side validation
+        const title = document.getElementById('title').value.trim();
+        const description = document.getElementById('description').value.trim();
+        
+        if (!title) {
+            showError('Please enter a project title');
+            return;
+        }
+        
+        if (!description) {
+            showError('Please enter a project description');
+            return;
+        }
+        
+        if (description.length < 10) {
+            showError('Project description should be at least 10 characters long');
+            return;
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Submitting...';
+        
+        try {
+            // Get form data
+            const formData = {
+                title: title,
+                description: description,
+                skills: document.getElementById('skills').value.trim(),
+                timeline: document.getElementById('timeline').value ? 
+                         parseInt(document.getElementById('timeline').value) : null
+            };
+            
+            // Get CSRF token
+            const csrfToken = getCSRFToken();
+            
+            const response = await fetch('/api/create_project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken && { 'X-CSRF-Token': csrfToken })
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                showSuccess('Project created successfully! Redirecting...');
+                
+                // Redirect to dashboard after 2 seconds
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('dashboard') }}";
+                }, 2000);
+                
+            } else {
+                throw new Error(result.message || 'Failed to create project');
+            }
+            
+        } catch (error) {
+            console.error('Error creating project:', error);
+            
+            if (error.message.includes('CSRF') || error.message.includes('token')) {
+                showError('Security token issue. Please refresh the page and try again.');
+            } else {
+                showError(error.message || 'An error occurred while creating the project. Please try again.');
+            }
+            
+        } finally {
+            // Reset button state
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Project Proposal';
+        }
+    });
+    
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        successDiv.style.display = 'none';
+    }
+    
+    function showSuccess(message) {
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        errorDiv.style.display = 'none';
+    }
+    
+    // Add real-time validation
+    const titleInput = document.getElementById('title');
+    const descTextarea = document.getElementById('description');
+    
+    titleInput.addEventListener('input', function() {
+        if (this.value.trim().length > 0) {
+            this.style.borderColor = '#d1d5db';
+        }
+    });
+    
+    descTextarea.addEventListener('input', function() {
+        if (this.value.trim().length >= 10) {
+            this.style.borderColor = '#d1d5db';
+        }
+    });
+});
+</script>
+{% endblock %}

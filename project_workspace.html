@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="main-content">
+        {# New Navigation Panel #}
+        <div class="project-nav-panel">
+            <a href="{{ url_for('index') }}" class="btn btn-panel">Home</a>
+            <a href="{{ url_for('about') }}" class="btn btn-panel">About</a>
+            {% if 'user_id' not in session %}
+                <a href="{{ url_for('login') }}" class="btn btn-panel">Sign In</a>
+                <a href="{{ url_for('register') }}" class="btn btn-panel">Sign Up</a>
+            {% endif %}
+        </div>
+
+        <h2>Project Workspace: {{ project.title }}</h2>
+        <p><strong>Description:</strong> {{ project.description }}</p>
+        <p><strong>Status:</strong> {{ project.status }}</p>
+        <p><strong>Mentee:</strong> 
+            {% set mentee_user = get_user_by_id(project.mentee_id) %}
+            {{ mentee_user.username if mentee_user else 'N/A' }}
+        </p>
+        <p><strong>Mentor:</strong> 
+            {% set mentor_user = get_user_by_id(project.mentor_id) %}
+            {{ mentor_user.username if mentor_user else 'Unassigned' }}
+        </p>
+
+        <div class="card">
+            <h3>Tasks</h3>
+            {% if project.tasks %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Task Name</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Due Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in project.tasks %}
+                                <tr>
+                                    <td>{{ task.task_name }}</td>
+                                    <td>{{ task.description }}</td>
+                                    <td>
+                                        <span class="status-{{ task.status|replace(' ', '-')|lower }}">
+                                            {{ task.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.due_date if task.due_date else 'Not set' }}</td>
+                                    <td>
+                                        {% if session.role == 'Mentee' and task.status != 'completed' %}
+                                            <button class="btn btn-sm complete-btn" 
+                                                    data-project-id="{{ project._id }}" 
+                                                    data-task-name="{{ task.task_name }}">
+                                                Mark Complete
+                                            </button>
+                                            <button class="btn btn-sm progress-btn" 
+                                                    data-project-id="{{ project._id }}" 
+                                                    data-task-name="{{ task.task_name }}">
+                                                Mark In Progress
+                                            </button>
+                                        {% elif task.status == 'completed' %}
+                                            <span class="completed-text">Completed</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No tasks defined for this project.</p>
+            {% endif %}
+
+            {% if session.role == 'Mentee' %}
+                <button class="btn" id="openTaskModal">Add New Task</button>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h3>Project Calendar</h3>
+            <div id="project-calendar"></div>
+        </div>
+
+        {# File Upload Section #}
+        <div class="card">
+            <h3>Project Files</h3>
+            <form id="fileUploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="projectFile">Upload File</label>
+                    <input type="file" id="projectFile" name="file" class="form-control">
+                </div>
+                <button type="submit" class="btn">Upload</button>
+            </form>
+            <div id="fileList" class="mt-3">
+                <!-- Files will be listed here -->
+            </div>
+        </div>
+
+        {# Add Task Modal #}
+        <div id="addTaskModal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h3>Add New Task</h3>
+                <form id="addTaskForm">
+                    <div class="form-group">
+                        <label for="taskName">Task Name</label>
+                        <input type="text" id="taskName" name="task_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDescription">Description</label>
+                        <textarea id="taskDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDueDate">Due Date</label>
+                        <input type="date" id="taskDueDate" name="due_date">
+                    </div>
+                    <button type="submit" class="btn">Add Task</button>
+                </form>
+                <p id="taskMessage"></p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize FullCalendar
+        const calendarEl = document.getElementById('project-calendar');
+        if (calendarEl) {
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: '/api/project/{{ project._id }}/calendar-events',
+                editable: true,
+                selectable: true,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                }
+            });
+            calendar.render();
+        }
+
+        // Task status update functionality
+        document.querySelectorAll('.complete-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateTaskStatus(
+                    this.dataset.projectId, 
+                    this.dataset.taskName, 
+                    'completed'
+                );
+            });
+        });
+
+        document.querySelectorAll('.progress-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateTaskStatus(
+                    this.dataset.projectId, 
+                    this.dataset.taskName, 
+                    'in_progress'
+                );
+            });
+        });
+
+        // Add Task Modal functionality
+        const addTaskModal = document.getElementById('addTaskModal');
+        const openTaskModalBtn = document.getElementById('openTaskModal');
+        const closeBtn = document.querySelector('.close-button');
+        const addTaskForm = document.getElementById('addTaskForm');
+        const taskMessage = document.getElementById('taskMessage');
+
+        if (openTaskModalBtn) {
+            openTaskModalBtn.addEventListener('click', openAddTaskModal);
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeAddTaskModal);
+        }
+
+        // File upload functionality
+        const fileUploadForm = document.getElementById('fileUploadForm');
+        if (fileUploadForm) {
+            fileUploadForm.addEventListener('submit', handleFileUpload);
+        }
+
+        // Load project files
+        loadProjectFiles();
+    });
+
+    async function updateTaskStatus(projectId, taskName, newStatus) {
+        try {
+            const response = await fetch(`/api/project/${projectId}/task/${taskName}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: newStatus }),
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                showNotification('Success', result.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Error', result.message || 'Failed to update task status.', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating task status:', error);
+            showNotification('Error', 'An error occurred. Please try again.', 'error');
+        }
+    }
+
+    function openAddTaskModal() {
+        const taskMessage = document.getElementById('taskMessage');
+        const addTaskForm = document.getElementById('addTaskForm');
+        
+        taskMessage.textContent = '';
+        taskMessage.className = '';
+        addTaskForm.reset();
+        document.getElementById('addTaskModal').style.display = 'block';
+    }
+
+    function closeAddTaskModal() {
+        document.getElementById('addTaskModal').style.display = 'none';
+    }
+
+    async function handleFileUpload(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        const fileInput = document.getElementById('projectFile');
+        
+        if (!fileInput.files[0]) {
+            showNotification('Error', 'Please select a file to upload.', 'error');
+            return;
+        }
+
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const response = await fetch(`/api/upload/{{ project._id }}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                showNotification('Success', result.message, 'success');
+                fileInput.value = '';
+                loadProjectFiles();
+            } else {
+                showNotification('Error', result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            showNotification('Error', 'An error occurred during file upload.', 'error');
+        }
+    }
+
+    async function loadProjectFiles() {
+        try {
+            const response = await fetch(`/api/project/{{ project._id }}/files`);
+            const files = await response.json();
+            
+            const fileList = document.getElementById('fileList');
+            if (files.length > 0) {
+                fileList.innerHTML = files.map(file => `
+                    <div class="file-item">
+                        <a href="/api/download/${file._id}" target="_blank">${file.original_name}</a>
+                        <span class="file-size">(${formatFileSize(file.file_size)})</span>
+                    </div>
+                `).join('');
+            } else {
+                fileList.innerHTML = '<p>No files uploaded yet.</p>';
+            }
+        } catch (error) {
+            console.error('Error loading files:', error);
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function showNotification(title, message, type) {
+        // You can integrate this with your existing notification system
+        alert(`${title}: ${message}`); // Replace with custom notification
+    }
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const modal = document.getElementById('addTaskModal');
+        if (event.target === modal) {
+            closeAddTaskModal();
+        }
+    });
+
+    // Add Task Form submission
+    document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const projectId = "{{ project._id }}";
+        const taskName = document.getElementById('taskName').value;
+        const description = document.getElementById('taskDescription').value;
+        const dueDate = document.getElementById('taskDueDate').value;
+
+        try {
+            const response = await fetch(`/api/project/${projectId}/task`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    task_name: taskName, 
+                    description: description, 
+                    due_date: dueDate 
+                }),
+            });
+
+            const result = await response.json();
+            const taskMessage = document.getElementById('taskMessage');
+            
+            if (response.ok) {
+                taskMessage.textContent = result.message;
+                taskMessage.className = 'success-message';
+                setTimeout(() => {
+                    closeAddTaskModal();
+                    location.reload();
+                }, 2000);
+            } else {
+                taskMessage.textContent = `Error: ${result.message || 'Failed to add task.'}`;
+                taskMessage.className = 'error-message';
+            }
+        } catch (error) {
+            console.error('Error adding task:', error);
+            const taskMessage = document.getElementById('taskMessage');
+            taskMessage.textContent = 'An error occurred. Please try again.';
+            taskMessage.className = 'error-message';
+        }
+    });
+</script>
+
+<style>
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.4);
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 500px;
+        border-radius: 10px;
+        position: relative;
+    }
+
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .close-button:hover {
+        color: black;
+    }
+
+    .status-completed { background-color: #d1fae5; color: #065f46; }
+    .status-in-progress { background-color: #fef3c7; color: #d97706; }
+    .status-pending { background-color: #dbeafe; color: #1e40af; }
+
+    .file-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .file-size {
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .success-message { color: green; text-align: center; }
+    .error-message { color: red; text-align: center; }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    table th, table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+
+    .completed-text {
+        color: #28a745;
+        font-weight: bold;
+    }
+
+    #project-calendar {
+        margin-top: 20px;
+        min-height: 400px;
+    }
+</style>
+{% endblock %}

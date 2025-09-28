@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Coordinator Dashboard - PMMS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc; 
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        /* Add to your existing CSS */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.custom-notification {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+        /* Layout */
+        .dashboard-layout { display: flex; min-height: 100vh; }
+        .sidebar { 
+            width: 280px; 
+            background: linear-gradient(180deg, #1e40af 0%, #3730a3 100%);
+            color: white;
+            padding: 2rem 1.5rem;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .main-content { 
+            flex: 1; 
+            padding: 2rem;
+            margin-left: 280px;
+        }
+        
+        /* Header */
+        .header { 
+            background: white; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        /* Cards */
+        .card { 
+            background: white; 
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem; 
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card { 
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover { transform: translateY(-2px); }
+        
+        /* Analytics Grid */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #374151;
+        }
+        
+        .chart-canvas {
+            width: 100%;
+            height: 200px;
+        }
+        
+        /* Filter and Sort Controls */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select, .sort-select {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+        }
+        
+        .search-input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        /* Rating Styles */
+        .rating-summary {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .rating-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1e40af;
+        }
+        
+        .rating-stars {
+            display: flex;
+            gap: 0.2rem;
+        }
+        
+        .star {
+            color: #fbbf24;
+            font-size: 1.2rem;
+        }
+        
+        /* Buttons */
+        .btn { 
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        
+        /* Table */
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .table th { background: #f9fafb; font-weight: 600; color: #374151; cursor: pointer; }
+        .table th:hover { background: #f3f4f6; }
+        .table tr:hover { background: #f9fafb; }
+        
+        /* Status badges */
+        .status-badge { 
+            padding: 0.25rem 0.75rem; 
+            border-radius: 9999px; 
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-proposed { background: #fef3c7; color: #d97706; }
+        .status-in-progress { background: #dbeafe; color: #2563eb; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        
+        /* Modal */
+        .modal { 
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .dashboard-layout {
+                flex-direction: column;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div style="display: flex; align-items: center;">
+            <div style="background: #3b82f6; padding: 0.75rem; border-radius: 8px; margin-right: 1rem;">
+                <span style="color: white; font-weight: bold;">PMMS</span>
+            </div>
+            <h1 style="font-size: 1.5rem; font-weight: bold;">Coordinator Dashboard</h1>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span>Welcome, {{ user.username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn" style="background: #ef4444; color: white;">Logout</a>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <h3 style="margin-bottom: 2rem; font-size: 1.25rem;">📊 Coordinator Panel</h3>
+            <ul style="list-style: none;">
+                <li style="margin-bottom: 0.5rem;">
+                    <a href="{{ url_for('dashboard') }}" 
+                       style="display: block; padding: 0.75rem; color: white; text-decoration: none; border-radius: 6px; background: rgba(255,255,255,0.1);">
+                       📈 Dashboard Overview
+                    </a>
+                </li>
+                <li style="margin-bottom: 0.5rem;">
+                    <a href="{{ url_for('profile') }}" 
+                       style="display: block; padding: 0.75rem; color: white; text-decoration: none; border-radius: 6px;">
+                       👤 My Profile
+                    </a>
+                </li>
+                <li style="margin-bottom: 0.5rem;">
+                    <a href="{{ url_for('create_project_page') }}" 
+                       style="display: block; padding: 0.75rem; color: white; text-decoration: none; border-radius: 6px;">
+                       ➕ Create Project
+                    </a>
+                </li>
+                <li style="margin-bottom: 0.5rem;">
+                    <a href="{{ url_for('activity_logs_page') }}" 
+                       style="display: block; padding: 0.75rem; color: white; text-decoration: none; border-radius: 6px;">
+                       📋 Activity Logs
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card" style="border-left-color: #3b82f6;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.875rem;">Total Mentors</p>
+                            <p id="mentor-count" style="font-size: 2rem; font-weight: bold;">0</p>
+                        </div>
+                        <div style="background: #dbeafe; padding: 0.75rem; border-radius: 8px;">
+                            👨‍🏫
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card" style="border-left-color: #10b981;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.875rem;">Total Mentees</p>
+                            <p id="mentee-count" style="font-size: 2rem; font-weight: bold;">0</p>
+                        </div>
+                        <div style="background: #d1fae5; padding: 0.75rem; border-radius: 8px;">
+                            👨‍🎓
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card" style="border-left-color: #f59e0b;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.875rem;">Active Projects</p>
+                            <p id="project-count" style="font-size: 2rem; font-weight: bold;">0</p>
+                        </div>
+                        <div style="background: #fef3c7; padding: 0.75rem; border-radius: 8px;">
+                            📁
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card" style="border-left-color: #8b5cf6;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <p style="color: #6b7280; font-size: 0.875rem;">Completion Rate</p>
+                            <p id="completion-rate" style="font-size: 2rem; font-weight: bold;">0%</p>
+                        </div>
+                        <div style="background: #ede9fe; padding: 0.75rem; border-radius: 8px;">
+                            📊
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Section -->
+            <div class="analytics-grid">
+                <div class="chart-container">
+                    <div class="chart-title">📊 Project Status Distribution</div>
+                    <canvas id="projectStatusChart" class="chart-canvas"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">⭐ Mentor Performance</div>
+                    <canvas id="mentorRatingChart" class="chart-canvas"></canvas>
+                    <div class="rating-summary">
+                        <div class="rating-value" id="avg-mentor-rating">0.0</div>
+                        <div class="rating-stars" id="mentor-stars"></div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-title">😊 Mentee Satisfaction</div>
+                    <canvas id="menteeRatingChart" class="chart-canvas"></canvas>
+                    <div class="rating-summary">
+                        <div class="rating-value" id="avg-mentee-rating">0.0</div>
+                        <div class="rating-stars" id="mentee-stars"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projects Table with Real-time Controls -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="font-size: 1.5rem; font-weight: bold;">Project Management</h2>
+                    <div class="controls">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search projects...">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">All Statuses</option>
+                            <option value="Proposed">Proposed</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                        <select id="sortSelect" class="sort-select">
+                            <option value="title">Sort by Title</option>
+                            <option value="status">Sort by Status</option>
+                            <option value="created_at">Sort by Date</option>
+                            <option value="rating">Sort by Rating</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th data-sort="title">Project Title</th>
+                                <th data-sort="mentee_username">Mentee</th>
+                                <th data-sort="mentor_username">Mentor</th>
+                                <th data-sort="status">Status</th>
+                                <th data-sort="rating">Rating</th>
+                                <th>Progress</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projects-table-body">
+                            <!-- Projects will be loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                    <p style="color: #6b7280;" id="project-count-display">Loading projects...</p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="prevBtn" class="btn" style="background: #f3f4f6;">Previous</button>
+                        <span id="pageInfo" style="padding: 0.5rem 1rem;">Page 1</span>
+                        <button id="nextBtn" class="btn" style="background: #f3f4f6;">Next</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Assign Mentor Modal -->
+    <div id="assignMentorModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1.25rem; font-weight: bold;">Assign Mentor</h3>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">×</button>
+            </div>
+            
+            <form id="assignMentorForm">
+                <input type="hidden" id="projectId">
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Project</label>
+                    <p id="projectTitle" style="padding: 0.5rem; background: #f3f4f6; border-radius: 4px;"></p>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Mentee</label>
+                    <p id="menteeName" style="padding: 0.5rem; background: #f3f4f6; border-radius: 4px;"></p>
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="mentorSelect" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Select Mentor</label>
+                    <select id="mentorSelect" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                        <option value="">Choose a mentor...</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" onclick="closeModal()" class="btn" style="background: #f3f4f6; flex: 1;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Assign Mentor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // Global variables for project management
+    let allProjects = [];
+    let filteredProjects = [];
+    let currentPage = 1;
+    const projectsPerPage = 10;
+    let currentSort = 'title';
+    let sortDirection = 'asc';
+
+    // Utility functions
+    function generateStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        let stars = '';
+
+        for (let i = 0; i < 5; i++) {
+            if (i < fullStars) {
+                stars += '★';
+            } else if (i === fullStars && hasHalfStar) {
+                stars += '½';
+            } else {
+                stars += '☆';
+            }
+        }
+        return stars;
+    }
+
+    function showNotification(message, type = 'info') {
+        // Remove existing notification
+        const existingNotification = document.querySelector('.custom-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        const notification = document.createElement('div');
+        notification.className = 'custom-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            z-index: 10000;
+            font-weight: 500;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.remove(), 4000);
+    }
+
+    // Project Management Functions - FIXED VERSION
+    async function loadAllProjects() {
+        try {
+            showNotification('Loading projects...', 'info');
+            const response = await fetch('/api/project_ratings');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const projects = await response.json();
+            allProjects = projects;
+            applyFiltersAndSort();
+            showNotification('Projects loaded successfully', 'success');
+            
+        } catch (error) {
+            console.error('Error loading projects:', error);
+            showNotification('Failed to load projects. Please try again.', 'error');
+            // Fallback: Show empty state
+            allProjects = [];
+            applyFiltersAndSort();
+        }
+    }
+
+    function applyFiltersAndSort() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        // Filter projects
+        filteredProjects = allProjects.filter(project => {
+            const matchesSearch = !searchTerm || 
+                project.title.toLowerCase().includes(searchTerm) ||
+                (project.mentee_username && project.mentee_username.toLowerCase().includes(searchTerm)) ||
+                (project.mentor_username && project.mentor_username.toLowerCase().includes(searchTerm));
+            
+            const matchesStatus = !statusFilter || project.status === statusFilter;
+            
+            return matchesSearch && matchesStatus;
+        });
+        
+        // Sort projects - FIXED SORTING
+        filteredProjects.sort((a, b) => {
+            let aValue = a[currentSort];
+            let bValue = b[currentSort];
+            
+            // Handle different data types for sorting
+            if (currentSort === 'created_at') {
+                aValue = new Date(aValue || 0);
+                bValue = new Date(bValue || 0);
+            } else if (currentSort === 'title' || currentSort === 'mentee_username' || currentSort === 'mentor_username') {
+                aValue = (aValue || '').toString().toLowerCase();
+                bValue = (bValue || '').toString().toLowerCase();
+            } else if (currentSort === 'rating' || currentSort === 'completion_percentage') {
+                aValue = parseFloat(aValue) || 0;
+                bValue = parseFloat(bValue) || 0;
+            } else {
+                aValue = (aValue || '').toString();
+                bValue = (bValue || '').toString();
+            }
+            
+            if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        currentPage = 1;
+        renderProjectsTable();
+    }
+
+    function renderProjectsTable() {
+        const tbody = document.getElementById('projects-table-body');
+        const startIndex = (currentPage - 1) * projectsPerPage;
+        const endIndex = startIndex + projectsPerPage;
+        const pageProjects = filteredProjects.slice(startIndex, endIndex);
+        
+        tbody.innerHTML = '';
+        
+        if (pageProjects.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">📭</div>
+                        No projects found
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        pageProjects.forEach(project => {
+            const row = document.createElement('tr');
+            
+            const completionPercentage = project.completion_percentage || 0;
+            const rating = project.rating || 0;
+            const createdDate = project.created_at ? new Date(project.created_at).toLocaleDateString() : 'N/A';
+            
+            // Escape HTML to prevent XSS
+            const escapeHtml = (text) => {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            };
+            
+            row.innerHTML = `
+                <td>
+                    <div style="display: flex; align-items: center;">
+                        <div style="background: #dbeafe; padding: 0.5rem; border-radius: 6px; margin-right: 0.75rem;">
+                            📋
+                        </div>
+                        <div>
+                            <div style="font-weight: 600;">${escapeHtml(project.title)}</div>
+                            <div style="font-size: 0.875rem; color: #6b7280;">
+                                ${escapeHtml(createdDate)}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td>${escapeHtml(project.mentee_username || 'N/A')}</td>
+                <td>
+                    ${project.mentor_username && project.mentor_username !== 'Unassigned' ? 
+                        `<div style="display: flex; align-items: center;">
+                            <div style="width: 2rem; height: 2rem; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 0.5rem;">
+                                👤
+                            </div>
+                            ${escapeHtml(project.mentor_username)}
+                        </div>` : 
+                        '<span class="status-badge status-proposed">Unassigned</span>'
+                    }
+                </td>
+                <td>
+                    <span class="status-badge ${getStatusClass(project.status)}">${escapeHtml(project.status)}</span>
+                </td>
+                <td>
+                    <div class="rating-stars">${generateStars(rating)}</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${rating.toFixed(1)}/5.0</div>
+                </td>
+                <td>
+                    <div style="width: 100px; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                        <div style="width: ${completionPercentage}%; background: #10b981; height: 100%; border-radius: 4px;"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${completionPercentage.toFixed(0)}%</div>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <a href="/project/${project._id}" class="btn" style="background: #dbeafe; color: #2563eb; text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.875rem;">👁️ View</a>
+                        ${project.mentor_username === 'Unassigned' ? 
+                            `<button onclick="openAssignMentorModal('${project._id}', '${escapeHtml(project.title)}', '${escapeHtml(project.mentee_username)}')" 
+                                    class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.875rem;">➕ Assign</button>` : 
+                            ''
+                        }
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Update pagination info
+        updatePaginationInfo();
+    }
+
+    function updatePaginationInfo() {
+        const totalPages = Math.ceil(filteredProjects.length / projectsPerPage);
+        document.getElementById('project-count-display').textContent = 
+            `Showing ${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`;
+            
+        document.getElementById('pageInfo').textContent = 
+            `Page ${currentPage} of ${totalPages || 1}`;
+            
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
+    }
+
+    function getStatusClass(status) {
+        switch(status) {
+            case 'Proposed': return 'status-proposed';
+            case 'In Progress': return 'status-in-progress';
+            case 'Completed': return 'status-completed';
+            case 'On Hold': return 'status-proposed';
+            default: return 'status-proposed';
+        }
+    }
+
+    // Sort functionality - FIXED VERSION
+    function setupSorting() {
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const sortField = th.getAttribute('data-sort');
+                
+                if (currentSort === sortField) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort = sortField;
+                    sortDirection = 'asc';
+                }
+                
+                // Update UI to show sort direction
+                document.querySelectorAll('th[data-sort]').forEach(header => {
+                    header.style.backgroundColor = '';
+                });
+                th.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                
+                applyFiltersAndSort();
+            });
+        });
+    }
+
+    // Modal functionality - FIXED VERSION
+    async function openAssignMentorModal(projectId, projectTitle, menteeName) {
+        try {
+            document.getElementById('projectId').value = projectId;
+            document.getElementById('projectTitle').textContent = projectTitle || 'Untitled Project';
+            document.getElementById('menteeName').textContent = menteeName || 'N/A';
+            document.getElementById('assignMentorModal').style.display = 'flex';
+            
+            await loadMentors();
+        } catch (error) {
+            console.error('Error opening modal:', error);
+            showNotification('Error opening assignment modal', 'error');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('assignMentorModal').style.display = 'none';
+    }
+
+    async function loadMentors() {
+        try {
+            const response = await fetch('/api/available_mentors');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const mentors = await response.json();
+            const select = document.getElementById('mentorSelect');
+            select.innerHTML = '<option value="">Choose a mentor...</option>';
+            
+            mentors.forEach(mentor => {
+                const option = document.createElement('option');
+                option.value = mentor._id;
+                option.textContent = mentor.profile?.full_name || mentor.username || 'Unknown Mentor';
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading mentors:', error);
+            showNotification('Failed to load mentors list', 'error');
+        }
+    }
+
+    async function handleAssignMentor(e) {
+        e.preventDefault();
+        
+        const projectId = document.getElementById('projectId').value;
+        const mentorId = document.getElementById('mentorSelect').value;
+        const projectTitle = document.getElementById('projectTitle').textContent;
+        
+        if (!mentorId) {
+            showNotification('Please select a mentor', 'error');
+            return;
+        }
+
+        try {
+            showNotification('Assigning mentor...', 'info');
+            
+            const response = await fetch('/api/assign_mentor', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                body: JSON.stringify({ 
+                    project_id: projectId, 
+                    mentor_id: mentorId 
+                })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                showNotification(result.message, 'success');
+                closeModal();
+                
+                // Reload all data after a short delay
+                setTimeout(async () => {
+                    await Promise.all([loadDashboardData(), loadAllProjects()]);
+                }, 1000);
+                
+            } else {
+                showNotification(result.error || 'Failed to assign mentor', 'error');
+            }
+        } catch (error) {
+            console.error('Error assigning mentor:', error);
+            showNotification('Network error. Please check your connection.', 'error');
+        }
+    }
+
+    // Analytics functions - FIXED VERSION
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('/api/summary_analytics');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Update statistics cards
+            document.getElementById('mentor-count').textContent = data.users_by_role?.Mentor || 0;
+            document.getElementById('mentee-count').textContent = data.users_by_role?.Mentee || 0;
+            document.getElementById('project-count').textContent = data.total_projects || 0;
+            document.getElementById('completion-rate').textContent = data.completion_rate ? data.completion_rate + '%' : '0%';
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            showNotification('Failed to load dashboard statistics', 'error');
+        }
+    }
+
+    // Initialize dashboard - FIXED VERSION
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            // Set up event listeners
+            document.getElementById('searchInput').addEventListener('input', () => {
+                applyFiltersAndSort();
+            });
+            
+            document.getElementById('statusFilter').addEventListener('change', () => {
+                applyFiltersAndSort();
+            });
+            
+            document.getElementById('sortSelect').addEventListener('change', (e) => {
+                currentSort = e.target.value;
+                applyFiltersAndSort();
+            });
+            
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderProjectsTable();
+                }
+            });
+            
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (currentPage < Math.ceil(filteredProjects.length / projectsPerPage)) {
+                    currentPage++;
+                    renderProjectsTable();
+                }
+            });
+            
+            document.getElementById('assignMentorForm').addEventListener('submit', handleAssignMentor);
+            
+            // Close modal when clicking outside
+            document.getElementById('assignMentorModal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeModal();
+            });
+
+            // Close modal with Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeModal();
+            });
+
+            setupSorting();
+
+            // Load initial data
+            await loadDashboardData();
+            await loadAllProjects();
+            
+        } catch (error) {
+            console.error('Error initializing dashboard:', error);
+            showNotification('Error initializing dashboard', 'error');
+        }
+    });
+</script>
+</body>
+</html>

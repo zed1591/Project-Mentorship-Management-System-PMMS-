@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card mt-3"> 
+    <div class="card-body">
+        <h5 class="card-title">Admin Tools</h5>
+        <a href="{{ url_for('admin_console') }}" class="btn btn-primary">Admin Console</a>
+        <a href="{{ url_for('activity_logs_page') }}" class="btn btn-info">Activity Logs</a>
+        <script src="{{ url_for('static', filename='script.js') }}"></script>
+    </div>
+</div>
+    </div>
+  </div>
+    <div class="dashboard-grid">
+        <div class="sidebar">
+            <h3>Admin Navigation</h3>
+            <ul>
+                {# Link to the new, secure admin dashboard route #}
+                <li><a href="{{ url_for('dashboard') }}">Dashboard Overview</a></li>
+                <li><a href="{{ url_for('profile') }}">My Profile</a></li>
+                <li><a href="{{ url_for('activity_logs_page') }}">Activity Logs</a></li>
+                {# Add more admin-specific links here #}
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <h2>Administrator Dashboard</h2>
+            <p>Welcome, {{ user.username }} ({{ user.role }})! Here's an overview of all users in the system.</p>
+
+            <div class="card">
+                <h3>All Registered Users</h3>
+                {% if users %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Full Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for registered_user in users %}
+                                    <tr>
+                                        <td>{{ registered_user.username }}</td>
+                                        <td>{{ registered_user.email }}</td>
+                                        <td>{{ registered_user.role }}</td>
+                                        {# FIX: Use .get() to safely access the 'profile' and 'full_name' attributes #}
+                                        <td>{{ registered_user.get('profile', {}).get('full_name', 'N/A') }}</td>
+                                        <td>
+                                            {# Link to the edit user profile page #}
+                                            <a href="{{ url_for('admin_edit_user_profile', user_id=registered_user._id) }}" class="btn btn-sm">Edit</a>
+                                            {% if registered_user.role != 'Administrator' %}
+                                            <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="{{ registered_user._id }}" data-username="{{ registered_user.username }}">Delete</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p>No users registered yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+

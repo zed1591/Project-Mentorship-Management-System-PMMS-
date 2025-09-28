@@ -1,0 +1,696 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h2>Mentor Dashboard</h2>
+            <p class="welcome-message">Welcome back, {{ user.username }} ({{ user.role }})!</p>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <i class="fas fa-project-diagram"></i>
+                    <h4>Total Projects</h4>
+                    <p>{{ assigned_projects | length }}</p>
+                </div>
+                <div class="summary-card">
+                    <i class="fas fa-tasks"></i>
+                    <h4>Open Tasks</h4>
+                    {% set open_tasks = 0 %}
+                    {% for project in assigned_projects %}
+                        {% for task in project.tasks %}
+                            {% if not task.completed %}
+                                {% set open_tasks = open_tasks + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                    <p>{{ open_tasks }}</p>
+                </div>
+                <div class="summary-card">
+                    <i class="fas fa-users"></i>
+                    <h4>Active Mentees</h4>
+                    <p>{{ assigned_projects | length }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="projects-section">
+            <h3>Your Assigned Projects</h3>
+            {% if assigned_projects %}
+                <div class="project-cards-grid">
+                    {% for project in assigned_projects %}
+                        <div class="project-card">
+                            <div class="card-header">
+                                <h4>{{ project.title }}</h4>
+                                <span class="project-status-{{ project.status | lower }}">{{ project.status }}</span>
+                            </div>
+                            <div class="card-body">
+                                {% set mentee = get_user_by_id(project.mentee_id) %}
+                                <p class="mentee-info"><i class="fas fa-user-graduate"></i> Mentee: {{ mentee.username if mentee else 'N/A' }}</p>
+                                
+                                {% set total_tasks = project.tasks | length %}
+                                {% set completed_tasks = project.tasks | selectattr('completed', 'equalto', True) | list | length %}
+                                {% set progress_percentage = (completed_tasks / total_tasks * 100) | round(0) if total_tasks > 0 else 0 %}
+                                
+                                <div class="progress-container">
+                                    <div class="progress-bar" style="width: {{ progress_percentage }}%;"></div>
+                                    <span class="progress-label">{{ progress_percentage }}% Complete</span>
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn btn-tasks view-tasks-btn" data-project-id="{{ project._id }}" data-project-title="{{ project.title }}"><i class="fas fa-tasks"></i> View Tasks</button>
+                                <button class="btn btn-feedback give-feedback-btn" data-project-id="{{ project._id }}"><i class="fas fa-comments"></i> Feedback</button>
+                                <button class="btn btn-chat chat-mentee-btn" data-mentee-id="{{ project.mentee_id }}"><i class="fas fa-paper-plane"></i> Chat</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>You currently have no assigned projects.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="tasksModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h4 id="tasksModalTitle">Tasks</h4>
+            <div class="task-list-container">
+                <ul id="taskList"></ul>
+            </div>
+            <div class="new-task-form">
+                <input type="text" id="newTaskInput" placeholder="Add new task...">
+                <button id="addTaskBtn" class="btn btn-success">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="feedbackModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h4>Give Feedback for Project: <span id="feedbackProjectTitle"></span></h4>
+            <form id="feedbackForm">
+                <div class="form-group">
+                    <label for="rating">Rating (1-5):</label>
+                    <input type="number" id="rating" name="rating" min="1" max="5" required>
+                </div>
+                <div class="form-group">
+                    <label for="comments">Comments:</label>
+                    <textarea id="comments" name="comments" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit Feedback</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h4 id="chatTitle">Chat</h4>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="Type your message...">
+                <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script> <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tasksModal = document.getElementById('tasksModal');
+            const feedbackModal = document.getElementById('feedbackModal');
+            const chatModal = document.getElementById('chatModal');
+            const closeButtons = document.querySelectorAll('.close-btn');
+
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tasksModal.style.display = 'none';
+                    feedbackModal.style.display = 'none';
+                    chatModal.style.display = 'none';
+                });
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target === tasksModal) tasksModal.style.display = 'none';
+                if (event.target === feedbackModal) feedbackModal.style.display = 'none';
+                if (event.target === chatModal) chatModal.style.display = 'none';
+            });
+            
+            // Helper function to update task status
+            const updateTaskStatus = async (projectId, taskId, completed) => {
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ completed: completed }),
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to update task status');
+                    }
+                    console.log('Task status updated successfully.');
+                    window.location.reload(); 
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to update task status. Please try again.');
+                }
+            };
+            
+            // Handle "View Tasks" button click
+            document.querySelectorAll('.view-tasks-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const projectId = e.target.dataset.projectId;
+                    const projectTitle = e.target.dataset.projectTitle;
+                    
+                    document.getElementById('tasksModalTitle').textContent = `Tasks for ${projectTitle}`;
+                    const taskListElement = document.getElementById('taskList');
+                    taskListElement.innerHTML = '';
+                    
+                    try {
+                        const response = await fetch(`/api/projects/${projectId}`);
+                        const projectData = await response.json();
+                        
+                        if (projectData && projectData.tasks) {
+                            projectData.tasks.forEach(task => {
+                                const li = document.createElement('li');
+                                li.innerHTML = `<input type="checkbox" id="task-${task._id}" class="task-checkbox" ${task.completed ? 'checked' : ''}> <label for="task-${task._id}">${task.name}</label>`;
+                                li.dataset.taskId = task._id;
+                                li.dataset.projectId = projectId;
+                                taskListElement.appendChild(li);
+                                
+                                li.querySelector('.task-checkbox').addEventListener('change', (event) => {
+                                    const completed = event.target.checked;
+                                    updateTaskStatus(projectId, task._id, completed);
+                                });
+                            });
+                        } else {
+                            taskListElement.innerHTML = '<p>No tasks found for this project.</p>';
+                        }
+                    } catch (error) {
+                        console.error('Error fetching tasks:', error);
+                        taskListElement.innerHTML = '<p>Failed to load tasks.</p>';
+                    }
+                    
+                    tasksModal.style.display = 'block';
+                });
+            });
+
+            // Handle "Give Feedback" button click
+            document.querySelectorAll('.give-feedback-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const projectId = e.target.dataset.projectId;
+                    const projectTitle = e.target.closest('.project-card').querySelector('h4').textContent;
+                    document.getElementById('feedbackProjectTitle').textContent = projectTitle;
+                    feedbackModal.dataset.projectId = projectId;
+                    feedbackModal.style.display = 'block';
+                });
+            });
+
+            // Handle Feedback Form Submission
+            document.getElementById('feedbackForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const projectId = feedbackModal.dataset.projectId;
+                const rating = document.getElementById('rating').value;
+                const comments = document.getElementById('comments').value;
+
+                if (!rating || !comments) {
+                    alert('Please provide both a rating and comments.');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/feedback`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ rating: parseInt(rating), comments }),
+                    });
+
+                    if (response.ok) {
+                        alert('Feedback submitted successfully!');
+                        feedbackModal.style.display = 'none';
+                        document.getElementById('feedbackForm').reset();
+                        window.location.reload(); 
+                    } else {
+                        const errorData = await response.json();
+                        alert(`Failed to submit feedback: ${errorData.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while submitting feedback.');
+                }
+            });
+
+            // Handle "Add Task" button click
+            document.getElementById('addTaskBtn').addEventListener('click', async () => {
+                const projectId = document.getElementById('tasksModal').dataset.projectId;
+                const taskName = document.getElementById('newTaskInput').value.trim();
+                
+                if (!taskName) {
+                    alert('Please enter a task name.');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/tasks`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ task_name: taskName }),
+                    });
+                    
+                    if (response.ok) {
+                        alert('Task added successfully!');
+                        document.getElementById('newTaskInput').value = '';
+                        window.location.reload();
+                    } else {
+                        const errorData = await response.json();
+                        alert(`Failed to add task: ${errorData.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while adding the task.');
+                }
+            });
+            
+            // Chat functionality
+            const socket = io();
+            const chatMessages = document.getElementById('chatMessages');
+            const chatInput = document.getElementById('chatInput');
+            const sendMessageBtn = document.getElementById('sendMessageBtn');
+
+            let currentRoom = null;
+            const currentUserId = "{{ session['user_id'] }}";
+
+            document.querySelectorAll('.chat-mentee-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const menteeId = e.target.dataset.menteeId;
+                    const roomId = [currentUserId, menteeId].sort().join('_');
+                    
+                    chatMessages.innerHTML = '';
+                    if (currentRoom) {
+                        socket.emit('leave', { room: currentRoom });
+                    }
+                    socket.emit('join_chat', { user_id: currentUserId, room: roomId });
+                    currentRoom = roomId;
+
+                    document.getElementById('chatTitle').textContent = `Chat with ${menteeId}`;
+                    chatModal.style.display = 'block';
+                });
+            });
+
+            sendMessageBtn.addEventListener('click', () => {
+                const message = chatInput.value.trim();
+                if (message && currentRoom) {
+                    socket.emit('send_message', {
+                        room: currentRoom,
+                        sender_id: currentUserId,
+                        message: message
+                    });
+                    chatInput.value = '';
+                }
+            });
+
+            socket.on('new_message', (data) => {
+                const messageElement = document.createElement('div');
+                messageElement.textContent = `${data.sender_id}: ${data.message}`;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+
+            socket.on('status', (data) => {
+                const statusElement = document.createElement('div');
+                statusElement.textContent = data.msg;
+                statusElement.style.fontStyle = 'italic';
+                chatMessages.appendChild(statusElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        });
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        .dashboard-container {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .dashboard-header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .dashboard-header h2 {
+            font-weight: 600;
+            color: #1e1e2d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .welcome-message {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            text-align: center;
+        }
+
+        .summary-card {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .summary-card i {
+            font-size: 2.5rem;
+            color: #007bff;
+            margin-bottom: 1rem;
+        }
+
+        .summary-card h4 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #1e1e2d;
+            margin: 0.5rem 0;
+        }
+
+        .summary-card p {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+        }
+
+        .projects-section {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .projects-section h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #1e1e2d;
+        }
+
+        .project-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .project-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease;
+        }
+        
+        .project-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h4 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .project-status-in_progress {
+            background-color: #ffc107;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .project-status-completed {
+            background-color: #28a745;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .project-status-on_hold {
+            background-color: #6c757d;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .mentee-info {
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 1rem;
+        }
+
+        .mentee-info i {
+            margin-right: 8px;
+            color: #007bff;
+        }
+
+        .progress-container {
+            background-color: #e9ecef;
+            border-radius: 50px;
+            height: 10px;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            border-radius: 50px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-label {
+            position: absolute;
+            right: 0;
+            top: -25px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #666;
+        }
+
+        .card-actions {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-around;
+            border-top: 1px solid #eee;
+            background-color: #fafafa;
+        }
+        
+        .btn {
+            background: none;
+            border: none;
+            color: #007bff;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+        
+        .btn i {
+            margin-right: 8px;
+        }
+        
+        .btn:hover {
+            background-color: #e9f5ff;
+        }
+        
+        .btn-tasks { color: #fd7e14; }
+        .btn-tasks:hover { background-color: #fff3e6; }
+        
+        .btn-feedback { color: #6f42c1; }
+        .btn-feedback:hover { background-color: #f3e9ff; }
+        
+        .btn-chat { color: #17a2b8; }
+        .btn-chat:hover { background-color: #e8f7f9; }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            padding-top: 60px;
+        }
+        
+        .modal-content {
+            background-color: #fff;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .close-btn {
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+        }
+        
+        .modal h4 {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* Task & Form Styles */
+        .task-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 15px;
+        }
+        
+        #taskList {
+            list-style: none;
+            padding: 0;
+        }
+        
+        #taskList li {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+        }
+        
+        #taskList li label {
+            margin-left: 10px;
+            flex-grow: 1;
+        }
+        
+        #taskList li:last-child {
+            border-bottom: none;
+        }
+        
+        .new-task-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .new-task-form input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        .new-task-form button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* Chat & Feedback Styles */
+        .chat-messages {
+            height: 300px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        .chat-input button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+{% endblock %}

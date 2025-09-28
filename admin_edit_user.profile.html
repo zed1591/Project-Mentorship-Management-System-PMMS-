@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="registration-container">
+        <div class="registration-header">
+            <h2>Edit User Profile: {{ user_to_edit.username }}</h2>
+            <p>Modify the details for this user.</p>
+        </div>
+
+        <div class="registration-form-card">
+            <form action="{{ url_for('admin_edit_user_profile', user_id=user_to_edit._id) }}" method="post">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" value="{{ user_to_edit.username }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ user_to_edit.email }}" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="full_name">Full Name</label>
+                        <input type="text" id="full_name" name="full_name" value="{{ user_to_edit.profile.get('full_name', '') }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <select id="role" name="role" onchange="toggleRoleSpecificFields(this.value)">
+                            <option value="Administrator" {% if user_to_edit.role == 'Administrator' %}selected{% endif %}>Administrator</option>
+                            <option value="Mentor" {% if user_to_edit.role == 'Mentor' %}selected{% endif %}>Mentor</option>
+                            <option value="Mentee" {% if user_to_edit.role == 'Mentee' %}selected{% endif %}>Mentee</option>
+                            <option value="Coordinator" {% if user_to_edit.role == 'Coordinator' %}selected{% endif %}>Coordinator</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Role-specific fields -->
+                <div id="mentor-fields" style="display: none;">
+                    <div class="form-group">
+                        <label for="expertise">Area of Expertise</label>
+                        <input type="text" id="expertise" name="expertise" value="{{ user_to_edit.profile.get('expertise', '') }}">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="years_experience">Years of Experience</label>
+                            <select id="years_experience" name="years_experience">
+                                <option value="">Select years</option>
+                                <option value="1-2 years" {% if user_to_edit.profile.get('years_experience') == '1-2 years' %}selected{% endif %}>1-2 years</option>
+                                <option value="3-5 years" {% if user_to_edit.profile.get('years_experience') == '3-5 years' %}selected{% endif %}>3-5 years</option>
+                                <option value="6-10 years" {% if user_to_edit.profile.get('years_experience') == '6-10 years' %}selected{% endif %}>6-10 years</option>
+                                <option value="10+ years" {% if user_to_edit.profile.get('years_experience') == '10+ years' %}selected{% endif %}>10+ years</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="availability">Availability</label>
+                            <input type="text" id="availability" name="availability" value="{{ user_to_edit.profile.get('availability', '') }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="mentee-fields" style="display: none;">
+                    <div class="form-group">
+                        <label for="skills">Skills (comma-separated)</label>
+                        <input type="text" id="skills" name="skills" value="{{ ', '.join(user_to_edit.profile.get('skills', [])) }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="interests">Interests (comma-separated)</label>
+                        <input type="text" id="interests" name="interests" value="{{ ', '.join(user_to_edit.profile.get('interests', [])) }}">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn create-account-btn">Update User Profile</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initial call to set correct fields based on current role
+        toggleRoleSpecificFields(document.getElementById('role').value);
+    });
+
+    function toggleRoleSpecificFields(selectedRole) {
+        const mentorFields = document.getElementById('mentor-fields');
+        const menteeFields = document.getElementById('mentee-fields');
+
+        mentorFields.style.display = 'none';
+        menteeFields.style.display = 'none';
+
+        if (selectedRole === 'Mentor') {
+            mentorFields.style.display = 'block';
+        } else if (selectedRole === 'Mentee') {
+            menteeFields.style.display = 'block';
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="registration-container">
+        <div class="registration-header">
+            <h2>Coordinator Registration</h2>
+            <p>Complete the form to create a new coordinator account. This requires a secret key.</p>
+        </div>
+
+        <div class="registration-form-card">
+            {% if error %}
+                <p class="error-message">{{ error }}</p>
+            {% endif %}
+            <form id="coordinator-register-form" action="{{ url_for('coordinator_register') }}" method="post">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="full_name">Full Name</label>
+                        <input type="text" id="full_name" name="full_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="secret_key">Secret Key</label>
+                        <input type="password" id="secret_key" name="secret_key" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn create-account-btn">Register Coordinator</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Custom message box function (replaces alert/confirm)
+    function showMessageBox(title, message) {
+        // Assume message box HTML is present in base.html
+        const overlay = document.getElementById('message-box-overlay');
+        const boxTitle = document.getElementById('message-box-title');
+        const boxText = document.getElementById('message-box-text');
+        const closeBtn = document.getElementById('message-box-close');
+        
+        boxTitle.textContent = title;
+        boxText.textContent = message;
+        overlay.style.display = 'block';
+
+        closeBtn.onclick = function() {
+            overlay.style.display = 'none';
+        };
+
+        window.onclick = function(event) {
+            if (event.target == overlay) {
+                overlay.style.display = 'none';
+            }
+        };
+    }
+    
+    document.getElementById('coordinator-register-form').addEventListener('submit', function(e) {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        if (password !== confirmPassword) {
+            e.preventDefault();
+            showMessageBox('Error', 'Passwords do not match.');
+        }
+    });
+</script>
+{% endblock %}
+

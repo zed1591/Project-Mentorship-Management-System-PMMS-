@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="dashboard-grid">
+        <div class="sidebar">
+            <h3>Admin Navigation</h3>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}">Dashboard Overview</a></li>
+                <li><a href="{{ url_for('profile') }}">My Profile</a></li>
+                <li><a href="{{ url_for('activity_logs_page') }}" class="active">Activity Logs</a></li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div class="content-header">
+                <h2>System Activity Logs</h2>
+                <p>View a detailed log of recent activities across the system</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Activities</h3>
+                    <button class="btn btn-sm" id="refresh-logs">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="activity-logs-container">
+                    <div class="loading-spinner"></div>
+                    <p>Loading activity logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const refreshButton = document.getElementById('refresh-logs');
+            const logsContainer = document.getElementById('activity-logs-container');
+            
+            // Load logs on page load
+            loadActivityLogs();
+            
+            // Refresh logs on button click
+            if (refreshButton) {
+                refreshButton.addEventListener('click', loadActivityLogs);
+            }
+            
+            function loadActivityLogs() {
+                // Show loading state
+                logsContainer.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p>Loading activity logs...</p>
+                `;
+                
+                // Add loading class to refresh button
+                if (refreshButton) {
+                    refreshButton.classList.add('loading');
+                    refreshButton.disabled = true;
+                }
+                
+                // Fetch activity logs from API
+                fetch('/api/activity_logs')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(logs => {
+                        displayActivityLogs(logs);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching activity logs:', error);
+                        logsContainer.innerHTML = `
+                            <p class="error-message">Error loading activity logs. Please try again.</p>
+                        `;
+                    })
+                    .finally(() => {
+                        // Remove loading state
+                        if (refreshButton) {
+                            refreshButton.classList.remove('loading');
+                            refreshButton.disabled = false;
+                        }
+                    });
+            }
+            
+            function displayActivityLogs(logs) {
+                if (!logs || logs.length === 0) {
+                    logsContainer.innerHTML = '<p>No activity logs found.</p>';
+                    return;
+                }
+                
+                const logsHtml = `
+                    <div class="activity-logs-table">
+                        <table class="logs-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Description</th>
+                                    <th>Project</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${logs.map(log => `
+                                    <tr>
+                                        <td>${formatTimestamp(log.timestamp)}</td>
+                                        <td>${getUserName(log.user_id)}</td>
+                                        <td><span class="log-action">${log.action_type || 'N/A'}</span></td>
+                                        <td>${log.description || 'No details'}</td>
+                                        <td>${log.project_id ? 'Project ' + log.project_id : 'N/A'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                logsContainer.innerHTML = logsHtml;
+            }
+            
+            function formatTimestamp(timestamp) {
+                if (!timestamp) return 'N/A';
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            }
+            
+            function getUserName(userId) {
+                // This would need to be enhanced to fetch actual usernames
+                // For now, just return the user ID
+                return userId ? 'User ' + userId.substring(0, 8) + '...' : 'System';
+            }
+        });
+    </script>
+{% endblock %}
