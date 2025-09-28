@@ -1,0 +1,349 @@
+<!-- templates/modals/task_comment_modal.html -->
+<div class="modal fade" id="taskCommentModal" tabindex="-1" aria-labelledby="taskCommentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="taskCommentModalLabel">
+                    <i class="fas fa-comments me-2"></i>Task Comments
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Task Info Header -->
+                <div class="task-info-header mb-4 p-3 bg-light rounded">
+                    <h6 id="commentTaskTitle" class="fw-bold mb-1">Task Title</h6>
+                    <div class="d-flex flex-wrap gap-3 text-muted small">
+                        <span id="commentTaskStatus" class="badge bg-secondary">Status</span>
+                        <span id="commentTaskAssignee">Assignee: </span>
+                        <span id="commentTaskDueDate">Due: </span>
+                    </div>
+                </div>
+
+                <!-- Comments Section -->
+                <div class="comments-section mb-4">
+                    <h6 class="fw-bold mb-3">Comments <span id="commentsCount" class="badge bg-primary">0</span></h6>
+                    
+                    <div id="commentsContainer" class="comments-container" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Comments will be loaded here dynamically -->
+                        <div class="text-center text-muted py-4" id="noCommentsMessage">
+                            <i class="fas fa-comment-slash fa-2x mb-2"></i>
+                            <p>No comments yet. Be the first to comment!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Comment Form -->
+                <div class="add-comment-section">
+                    <form id="addCommentForm" method="POST">
+                        <!-- CSRF Token -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" id="commentTaskId" name="task_id">
+                        
+                        <div class="mb-3">
+                            <label for="commentText" class="form-label fw-bold">Add Comment</label>
+                            <textarea class="form-control" id="commentText" name="comment" rows="3" 
+                                      placeholder="Write your comment here..." required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Comment Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="comment_type" id="commentTypeGeneral" value="general" checked>
+                                <label class="form-check-label" for="commentTypeGeneral">
+                                    General
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="comment_type" id="commentTypeQuestion" value="question">
+                                <label class="form-check-label" for="commentTypeQuestion">
+                                    Question
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="comment_type" id="commentTypeUpdate" value="update">
+                                <label class="form-check-label" for="commentTypeUpdate">
+                                    Progress Update
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="comment_type" id="commentTypeIssue" value="issue">
+                                <label class="form-check-label" for="commentTypeIssue">
+                                    Issue/Blocked
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="notifyMembers" name="notify_members" checked>
+                                <label class="form-check-label" for="notifyMembers">
+                                    Notify project members
+                                </label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" id="submitCommentBtn">
+                                <i class="fas fa-paper-plane me-2"></i>Post Comment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-header {
+        border-bottom: 2px solid #0dcaf0;
+    }
+    
+    .comment-item {
+        border-left: 3px solid #0dcaf0;
+        padding-left: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .comment-item.question { border-left-color: #ffc107; }
+    .comment-item.update { border-left-color: #198754; }
+    .comment-item.issue { border-left-color: #dc3545; }
+    
+    .comment-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+    
+    .comment-author {
+        font-weight: bold;
+        color: #0d6efd;
+    }
+    
+    .comment-time {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
+    
+    .comment-type-badge {
+        font-size: 0.7em;
+        padding: 2px 6px;
+    }
+    
+    .comments-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .comments-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .comments-container::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const commentForm = document.getElementById('addCommentForm');
+    const commentText = document.getElementById('commentText');
+    const commentsContainer = document.getElementById('commentsContainer');
+    const noCommentsMessage = document.getElementById('noCommentsMessage');
+    const commentsCount = document.getElementById('commentsCount');
+
+    let currentTaskId = null;
+
+    // Function to open modal with task data
+    window.openTaskComments = function(taskId, taskTitle, taskStatus, assignee, dueDate) {
+        currentTaskId = taskId;
+        
+        // Update modal header with task info
+        document.getElementById('commentTaskTitle').textContent = taskTitle;
+        document.getElementById('commentTaskStatus').textContent = taskStatus;
+        document.getElementById('commentTaskStatus').className = `badge bg-${getStatusColor(taskStatus)}`;
+        document.getElementById('commentTaskAssignee').textContent = `Assignee: ${assignee}`;
+        document.getElementById('commentTaskDueDate').textContent = `Due: ${dueDate || 'Not set'}`;
+        document.getElementById('commentTaskId').value = taskId;
+        
+        // Load comments for this task
+        loadComments(taskId);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('taskCommentModal'));
+        modal.show();
+    };
+
+    function getStatusColor(status) {
+        const colors = {
+            'pending': 'secondary',
+            'in_progress': 'primary',
+            'review': 'warning',
+            'completed': 'success',
+            'cancelled': 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    // Load comments for a task
+    function loadComments(taskId) {
+        fetch(`/get-task-comments?task_id=${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayComments(data.comments);
+                } else {
+                    console.error('Error loading comments:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading comments:', error);
+            });
+    }
+
+    // Display comments in the container
+    function displayComments(comments) {
+        commentsContainer.innerHTML = '';
+        
+        if (comments.length === 0) {
+            commentsContainer.appendChild(noCommentsMessage);
+            commentsCount.textContent = '0';
+            return;
+        }
+        
+        noCommentsMessage.remove();
+        commentsCount.textContent = comments.length;
+        
+        comments.forEach(comment => {
+            const commentElement = createCommentElement(comment);
+            commentsContainer.appendChild(commentElement);
+        });
+        
+        // Scroll to bottom
+        commentsContainer.scrollTop = commentsContainer.scrollHeight;
+    }
+
+    // Create comment HTML element
+    function createCommentElement(comment) {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = `comment-item ${comment.comment_type}`;
+        
+        const timeAgo = getTimeAgo(comment.created_at);
+        
+        commentDiv.innerHTML = `
+            <div class="comment-header">
+                <div>
+                    <span class="comment-author">${comment.author_name}</span>
+                    <span class="badge comment-type-badge bg-${getCommentTypeColor(comment.comment_type)}">
+                        ${comment.comment_type}
+                    </span>
+                </div>
+                <span class="comment-time" title="${comment.created_at}">${timeAgo}</span>
+            </div>
+            <div class="comment-content">${escapeHtml(comment.comment)}</div>
+            ${comment.attachments ? `<div class="comment-attachments mt-2"><small class="text-muted"><i class="fas fa-paperclip"></i> ${comment.attachments} attachments</small></div>` : ''}
+        `;
+        
+        return commentDiv;
+    }
+
+    function getCommentTypeColor(type) {
+        const colors = {
+            'general': 'info',
+            'question': 'warning',
+            'update': 'success',
+            'issue': 'danger'
+        };
+        return colors[type] || 'secondary';
+    }
+
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+        
+        if (diffInSeconds < 60) return 'just now';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+        return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Form submission handler
+    commentForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!commentText.value.trim()) {
+            showCommentAlert('danger', 'Please enter a comment');
+            return;
+        }
+
+        // Disable button and show loading state
+        const submitBtn = document.getElementById('submitCommentBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Posting...';
+
+        const formData = new FormData(commentForm);
+        formData.append('author_id', '{{ session.user_id }}');
+
+
+        fetch('/add-task-comment', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showCommentAlert('success', 'Comment added successfully!');
+                commentForm.reset();
+                
+                // Reload comments
+                loadComments(currentTaskId);
+            } else {
+                showCommentAlert('danger', 'Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showCommentAlert('danger', 'Error adding comment. Please try again.');
+        })
+        .finally(() => {
+            // Reset button state
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Post Comment';
+        });
+    });
+
+    function showCommentAlert(type, message) {
+        // Remove existing alerts
+        document.querySelectorAll('.comment-alert').forEach(alert => alert.remove());
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show comment-alert mt-3`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.querySelector('.add-comment-section').insertBefore(alertDiv, commentForm);
+    }
+
+    // Reset form when modal is closed
+    const modal = document.getElementById('taskCommentModal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function () {
+            commentForm.reset();
+            document.querySelectorAll('.comment-alert').forEach(alert => alert.remove());
+        });
+    }
+});
+</script>

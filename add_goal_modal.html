@@ -1,0 +1,83 @@
+<!-- templates/modals/add_goal_modal.html -->
+<div class="modal fade" id="addGoalModal" tabindex="-1" aria-labelledby="addGoalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addGoalModalLabel">Add New Learning Goal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addGoalForm">
+                    <div class="mb-3">
+                        <label for="goalTitle" class="form-label">Goal Title</label>
+                        <input type="text" class="form-control" id="goalTitle" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="goalDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="goalDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="goalDeadline" class="form-label">Target Deadline</label>
+                        <input type="date" class="form-control" id="goalDeadline" name="deadline">
+                    </div>
+                    <div class="mb-3">
+                        <label for="goalPriority" class="form-label">Priority</label>
+                        <select class="form-control" id="goalPriority" name="priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitGoalForm()">Add Goal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddGoalModal() {
+    // Clear previous form data
+    document.getElementById('addGoalForm').reset();
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('goalDeadline').min = today;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addGoalModal'));
+    modal.show();
+}
+
+function submitGoalForm() {
+    const form = document.getElementById('addGoalForm');
+    const formData = new FormData(form);
+    
+    // Add additional data
+    formData.append('mentee_id', '{{ user._id }}');
+    
+    // Here you would typically send this to your backend
+    fetch('/api/goals/add', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and refresh goals
+            bootstrap.Modal.getInstance(document.getElementById('addGoalModal')).hide();
+            loadGoals();
+            showAlert('Goal added successfully!', 'success');
+        } else {
+            showAlert('Error adding goal: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error adding goal', 'error');
+    });
+}
+</script>

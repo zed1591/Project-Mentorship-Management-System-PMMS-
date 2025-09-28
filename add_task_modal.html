@@ -1,0 +1,288 @@
+<!-- templates/modals/add_task_modal.html -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addTaskModalLabel">
+                    <i class="fas fa-plus-circle me-2"></i>Add New Task
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTaskForm" method="POST">
+                    <!-- CSRF Token -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" id="taskProjectId" name="project_id">
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="taskTitle" class="form-label fw-bold">Task Title <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="taskTitle" name="title" required 
+                                       placeholder="Enter task title...">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="taskPriority" class="form-label fw-bold">Priority <span class="text-danger">*</span></label>
+                                <select class="form-select" id="taskPriority" name="priority" required>
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="taskDescription" class="form-label fw-bold">Description</label>
+                        <textarea class="form-control" id="taskDescription" name="description" rows="3" 
+                                  placeholder="Describe the task in detail..."></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="taskAssignee" class="form-label fw-bold">Assign To</label>
+                                <select class="form-select" id="taskAssignee" name="assignee_id">
+                                    <option value="">Select assignee</option>
+                                    {% if current_user.role == 'mentor' %}
+                                        <option value="{{ current_user.id }}">Myself</option>
+                                        <!-- Mentees will be populated dynamically -->
+                                    {% else %}
+                                        <option value="{{ current_user.id }}">Myself</option>
+                                        <option value="mentor">My Mentor</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="taskStatus" class="form-label fw-bold">Status</label>
+                                <select class="form-select" id="taskStatus" name="status">
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="review">Review</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="taskDueDate" class="form-label fw-bold">Due Date</label>
+                                <input type="date" class="form-control" id="taskDueDate" name="due_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="taskEstimatedHours" class="form-label fw-bold">Estimated Hours</label>
+                                <input type="number" class="form-control" id="taskEstimatedHours" name="estimated_hours" 
+                                       min="0" step="0.5" placeholder="e.g., 2.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="taskTags" class="form-label fw-bold">Tags</label>
+                        <input type="text" class="form-control" id="taskTags" name="tags" 
+                               placeholder="Enter tags separated by commas (e.g., design, development, bug)">
+                        <div class="form-text">Use tags to categorize your tasks</div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="taskNotify" name="notify_assignee" checked>
+                        <label class="form-check-label" for="taskNotify">
+                            Notify assignee via email
+                        </label>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Tip:</strong> Provide clear descriptions and realistic due dates for better task management.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="submitTaskBtn">
+                    <i class="fas fa-save me-2"></i>Create Task
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-header {
+        border-bottom: 2px solid #198754;
+    }
+    
+    .priority-low { border-left: 4px solid #6c757d; }
+    .priority-medium { border-left: 4px solid #ffc107; }
+    .priority-high { border-left: 4px solid #fd7e14; }
+    .priority-urgent { border-left: 4px solid #dc3545; }
+    
+    #taskPriority option[value="low"] { color: #6c757d; }
+    #taskPriority option[value="medium"] { color: #ffc107; font-weight: bold; }
+    #taskPriority option[value="high"] { color: #fd7e14; font-weight: bold; }
+    #taskPriority option[value="urgent"] { color: #dc3545; font-weight: bold; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const submitTaskBtn = document.getElementById('submitTaskBtn');
+    const taskForm = document.getElementById('addTaskForm');
+    const taskTitle = document.getElementById('taskTitle');
+    const taskDueDate = document.getElementById('taskDueDate');
+
+    // Set minimum due date to today
+    if (taskDueDate) {
+        const today = new Date().toISOString().split('T')[0];
+        taskDueDate.min = today;
+    }
+
+    // Form validation
+    function validateTaskForm() {
+        let isValid = true;
+        
+        // Clear previous errors
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+
+        // Validate task title
+        if (!taskTitle.value.trim()) {
+            showError(taskTitle, 'Task title is required');
+            isValid = false;
+        } else if (taskTitle.value.trim().length < 3) {
+            showError(taskTitle, 'Task title must be at least 3 characters long');
+            isValid = false;
+        }
+
+        // Validate due date if provided
+        if (taskDueDate.value) {
+            const selectedDate = new Date(taskDueDate.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (selectedDate < today) {
+                showError(taskDueDate, 'Due date cannot be in the past');
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    function showError(input, message) {
+        input.classList.add('is-invalid');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'invalid-feedback';
+        errorDiv.textContent = message;
+        input.parentNode.appendChild(errorDiv);
+    }
+
+    // Submit button handler
+    if (submitTaskBtn) {
+        submitTaskBtn.addEventListener('click', function() {
+            if (!validateTaskForm()) {
+                return;
+            }
+
+            // Disable button and show loading state
+            submitTaskBtn.disabled = true;
+            submitTaskBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
+
+            const formData = new FormData(taskForm);
+            
+            // Add additional data
+            formData.append('author_id', '{{ session.user_id }}');
+            formData.append('created_at', new Date().toISOString());
+
+            fetch('/add-task', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('success', 'Task created successfully!');
+                    
+                    // Close modal and refresh task list
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addTaskModal'));
+                        modal.hide();
+                        taskForm.reset();
+                        
+                        // Refresh task list if function exists
+                        if (typeof refreshTaskList === 'function') {
+                            refreshTaskList();
+                        }
+                    }, 1500);
+                } else {
+                    showAlert('danger', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'Error creating task. Please try again.');
+            })
+            .finally(() => {
+                // Reset button state
+                submitTaskBtn.disabled = false;
+                submitTaskBtn.innerHTML = '<i class="fas fa-save me-2"></i>Create Task';
+            });
+        });
+    }
+
+    function showAlert(type, message) {
+        // Remove existing alerts
+        document.querySelectorAll('.alert-dismissible').forEach(alert => alert.remove());
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.querySelector('.modal-body').appendChild(alertDiv);
+    }
+
+    // Reset form when modal is closed
+    const modal = document.getElementById('addTaskModal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function () {
+            taskForm.reset();
+            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+            document.querySelectorAll('.alert-dismissible').forEach(alert => alert.remove());
+        });
+    }
+
+    // Populate assignee dropdown for mentors
+    function populateAssigneeDropdown(mentees) {
+        const assigneeSelect = document.getElementById('taskAssignee');
+        if (assigneeSelect && mentees) {
+            mentees.forEach(mentee => {
+                const option = document.createElement('option');
+                option.value = mentee.id;
+                option.textContent = mentee.name;
+                assigneeSelect.appendChild(option);
+            });
+        }
+    }
+
+    // Make function globally available
+    window.populateAssigneeDropdown = populateAssigneeDropdown;
+});
+</script>

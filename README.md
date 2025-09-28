@@ -53,11 +53,6 @@ pip install -r requirements.txt
 4. Configure Environment Variables
 Create a file named .env in the root directory and define the following essential variables:
 
-# .env file content
-SECRET_KEY='your_super_secret_flask_key'
-MONGO_URI='mongodb://localhost:27017/pmms_db'
-REGISTRATION_SECRET_KEY='secure_key_for_admin_registration'
-
 # Flask-Mail (Example: using a dedicated Gmail app password)
 MAIL_USERNAME='your_email@gmail.com'
 MAIL_PASSWORD='your_app_password' 
