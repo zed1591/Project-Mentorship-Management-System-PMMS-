@@ -1,0 +1,146 @@
+
+<div class="modal fade" id="menteeFeedbackModal" tabindex="-1" aria-labelledby="menteeFeedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="menteeFeedbackModalLabel">
+                    <i class="fas fa-comment-medical me-2"></i>Provide Feedback
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="menteeFeedbackForm">
+                    <input type="hidden" id="projectId" name="project_id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="feedbackType" class="form-label fw-bold">Feedback Type <span class="text-danger">*</span></label>
+                                <select class="form-select" id="feedbackType" name="feedback_type" required>
+                                    <option value="">Select feedback type</option>
+                                    <option value="general">General Feedback</option>
+                                    <option value="technical">Technical Issue</option>
+                                    <option value="suggestion">Suggestion</option>
+                                    <option value="complaint">Complaint</option>
+                                    <option value="appreciation">Appreciation</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="rating" class="form-label fw-bold">Rating</label>
+                                <div class="rating-stars">
+                                    <div class="d-flex">
+                                        {% for i in range(5, 0, -1) %}
+                                        <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" class="d-none">
+                                        <label for="star{{ i }}" class="star-label me-1" title="{{ i }} stars">
+                                            <i class="far fa-star fa-lg text-warning"></i>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                    <small class="text-muted">(Optional) Click stars to rate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="feedbackSubject" class="form-label fw-bold">Subject</label>
+                        <input type="text" class="form-control" id="feedbackSubject" name="subject" placeholder="Brief subject of your feedback">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="feedbackMessage" class="form-label fw-bold">Detailed Message <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="feedbackMessage" name="message" rows="5" required 
+                                  placeholder="Please provide detailed feedback about your experience..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Priority</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityLow" value="low" checked>
+                            <label class="form-check-label text-success" for="priorityLow">Low Priority</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityMedium" value="medium">
+                            <label class="form-check-label text-warning" for="priorityMedium">Medium Priority</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityHigh" value="high">
+                            <label class="form-check-label text-danger" for="priorityHigh">High Priority</label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Your feedback helps us improve the mentoring experience.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitFeedbackBtn">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .star-label { cursor: pointer; transition: transform 0.2s; }
+    .star-label:hover { transform: scale(1.2); }
+    input[name="rating"]:checked ~ label .fa-star { color: #ffc107 !important; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Star rating functionality
+    const starInputs = document.querySelectorAll('input[name="rating"]');
+    starInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const stars = document.querySelectorAll('.star-label .fa-star');
+            stars.forEach(star => star.classList.replace('fas', 'far'));
+            
+            const checkedIndex = Array.from(starInputs).indexOf(this);
+            for (let i = 0; i <= checkedIndex; i++) {
+                const star = document.querySelector(`label[for="star${5-i}"] .fa-star`);
+                if (star) star.classList.replace('far', 'fas');
+            }
+        });
+    });
+
+    // Submit button handler
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+            const form = document.getElementById('menteeFeedbackForm');
+            const formData = new FormData(form);
+            
+            // Simple validation
+            if (!formData.get('feedback_type') || !formData.get('message')) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            // Submit via AJAX
+            fetch('/api/mentee/feedback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(formData))
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert('Feedback submitted successfully!');
+                    bootstrap.Modal.getInstance(document.getElementById('menteeFeedbackModal')).hide();
+                    form.reset();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error submitting feedback');
+            });
+        });
+    }
+});
+</script>
+
